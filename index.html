@@ -82,6 +82,17 @@
             border-radius: 0.75rem;
             margin: 0 auto;
         }
+
+        /* 背景保溫庫，強迫 Safari 提前渲染避免解碼閃動 */
+        #gpu-card-vault {
+            position: absolute;
+            left: -9999px;
+            top: -9999px;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            opacity: 0.01;
+        }
     </style>
 </head>
 <body id="interactive-screen" class="min-h-screen text-gray-100 flex flex-col justify-center items-center p-6 select-none relative cursor-pointer">
@@ -108,13 +119,14 @@
     </div>
 
     <!-- ================================================================= -->
-    <!-- 觀眾開場引導階段 (心理學防穿幫版，無編號字眼) -->
+    <!-- 觀眾開場引導階段 (已移除任何編號暗示，心理學高度隱蔽) -->
     <!-- ================================================================= -->
     <div id="audience-intro-panel" class="w-full max-w-xs flex flex-col items-center text-center bg-neutral-900/30 border border-white/5 rounded-3xl p-6 backdrop-blur-md hidden z-30">
         <div class="w-16 h-16 rounded-full border border-red-800/40 flex items-center justify-center mb-6">
             <i data-lucide="scan-face" class="w-8 h-8 text-red-600 animate-pulse"></i>
         </div>
         
+        <!-- 完全移除編號顯示，對外表現為純粹獨立抽牌說明 -->
         <h3 id="audience-welcome-text" class="text-base text-gray-300 leading-relaxed mb-6 font-semibold">
             等等請點擊選擇一張牌，<br>請點擊準備開始。
             <span id="audience-order-id" class="hidden">--</span>
@@ -136,19 +148,18 @@
             <!-- 卡牌後方的霓虹光暈 -->
             <div id="card-glow" class="absolute w-72 h-[380px] bg-red-600/5 rounded-2xl blur-3xl transition-all duration-1000 opacity-50"></div>
 
-            <!-- 卡牌外框容器 (精確 1:1.40 黃金比例：寬256px * 高358px) -->
+            <!-- 卡牌外框容器 (黃金比例 1:1.40) -->
             <div id="card-outer" class="relative w-64 h-[358px] bg-neutral-950/90 border border-white/10 rounded-2xl card-pulse flex items-center justify-center transition-all duration-300 overflow-hidden">
                 
-                <!-- 內層雙槽卡牌滑動通道 (完全透明底) -->
+                <!-- 內層雙槽卡牌滑動通道 -->
                 <div id="card-content" class="w-full h-full relative rounded-2xl overflow-hidden will-change-transform bg-transparent">
                     
                     <!-- 卡牌槽 A (目前展示中) -->
                     <div id="slot-active" class="absolute inset-0 w-full h-full flex items-center justify-center translate-x-0 will-change-transform p-0">
-                        <!-- 預設開場 Ready 樣式 (極簡卡背無上下白邊不符問題) -->
+                        <!-- 預設開場 Ready 樣式 -->
                         <div id="default-card-ui" class="w-full h-full flex flex-col items-center justify-center border-[3px] border-red-950/80 rounded-2xl bg-gradient-to-b from-neutral-950 via-red-950 to-neutral-950 p-4 relative overflow-hidden shadow-2xl">
                             <div class="absolute inset-0 opacity-15 bg-[radial-gradient(#ff0000_1px,transparent_1px)] [background-size:12px_12px]"></div>
                             
-                            <!-- 經典神秘卡背中央圖騰 -->
                             <div class="w-16 h-16 rounded-full border border-red-800/40 flex items-center justify-center mb-6 relative">
                                 <div class="absolute inset-1 rounded-full border border-dashed border-red-700/30 animate-spin" style="animation-duration: 25s;"></div>
                                 <i data-lucide="eye" class="w-6 h-6 text-red-900 animate-pulse"></i>
@@ -187,7 +198,7 @@
             </div>
 
             <!-- 強迫牌自訂設定 -->
-            <div class="space-y-6">
+            <div class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">設定首張強迫牌 (1號觀眾)</label>
                     <div class="grid grid-cols-2 gap-3">
@@ -224,7 +235,7 @@
                 </div>
 
                 <div class="text-[11px] text-neutral-500 leading-relaxed bg-black/30 p-2.5 rounded-lg border border-white/5">
-                    1號觀眾預設遵照日期餘數規則。此面板設定可用於覆蓋首張牌，第2張起自動按「加5」且花色「黑桃-紅磚-梅花-愛心」遞迴。
+                    1號觀眾預設遵照日期餘數規則。此設定可用於覆蓋首張牌，第2張起自動按「加5」且花色「黑桃-紅磚-梅花-愛心」遞迴。
                 </div>
 
                 <!-- 確定完成按鈕 -->
@@ -238,6 +249,9 @@
     <!-- 背景極微弱動態網格 -->
     <div class="absolute inset-0 bg-[linear-gradient(to_right,#ffffff01_1px,transparent_1px),linear-gradient(to_bottom,#ffffff01_1px,transparent_1px)] bg-[size:60px_60px] pointer-events-none"></div>
 
+    <!-- 背景解碼保溫庫，解決 Safari 滑動圖片時可能產生的閃爍問題 -->
+    <div id="gpu-card-vault"></div>
+
     <!-- ================================================================= -->
     <!-- 核心魔術連線與控制 JavaScript -->
     <!-- ================================================================= -->
@@ -245,7 +259,6 @@
         const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, collection, runTransaction } = window.firebase_imports;
 
         // --- 全域變數與卡牌陣列 ---
-        // 依照規則：花色從第一張餘數規則，第二張起循環順序：黑桃(S) ➔ 紅磚(D) ➔ 梅花(C) ➔ 愛心(H)
         const suits = [
             { code: 'H', char: '♥', color: 'text-red-600', engName: 'heart', isRed: true },
             { code: 'S', char: '♠', color: 'text-neutral-900', engName: 'spade', isRed: false },
@@ -257,16 +270,16 @@
 
         // 魔術狀態機
         let state = {
-            role: 'magician', 
+            role: 'solo', // 'magician', 'audience' 或 'solo' (安全離線備用網)
             roomId: '',
             userId: '',
-            userOrder: 0, // 觀眾進入順序編號 (1, 2, 3...)
-            phase: 0, // 0: Ready, 1: Magician Guide 1, 2: Magician Guide 2, 3: Audience Action
-            status: 'idle', // idle, flashing, finished, locked
-            normalSpeed: 220, // 固定為安全的 220 毫秒高速輪播
+            userOrder: 0, 
+            phase: 0, 
+            status: 'idle', 
+            normalSpeed: 220, 
             forceCard: null, 
-            magicianForceMode: false, // 魔術師端：是否開啟迫牌同步模式
-            magicianForceIndex: 1, // 魔術師目前正在迫第幾張牌
+            magicianForceMode: false, 
+            magicianForceIndex: 1, 
             flashTimeout: null,
             currentDisplayCard: null,
             stopping: false,
@@ -275,11 +288,31 @@
         };
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-magic-id';
-        const firebaseConfig = JSON.parse(__firebase_config);
+        
+        // --- 核心：直連並綁定您的 Firebase Config 帳號 ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDx2VEGJJCEs_OcZELIU9woRdo3EfZoe6M",
+            authDomain: "pickonecard.firebaseapp.com",
+            databaseURL: "https://pickonecard-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "pickonecard",
+            storageBucket: "pickonecard.firebasestorage.app",
+            messagingSenderId: "785899084675",
+            appId: "1:785899084675:web:07ffef15649f52ecc774b6",
+            measurementId: "G-8CPBR4RC9G"
+        };
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        let app, auth, db, firebaseEnabled = false;
+
+        if (firebaseConfig && firebaseConfig.apiKey) {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                firebaseEnabled = true;
+            } catch (e) {
+                console.error("Firebase 初始化失敗，將以離線安全單人版運行:", e);
+            }
+        }
 
         // --- DOM 節點 ---
         const magicianPairingPanel = document.getElementById('magician-pairing-panel');
@@ -304,6 +337,7 @@
         const settingsSaveBtn = document.getElementById('settings-save-btn');
         const forceSuitSelect = document.getElementById('force-suit');
         const forceValueSelect = document.getElementById('force-value');
+        const gpuCardVault = document.getElementById('gpu-card-vault');
 
         // --- 震動回饋 ---
         function playTick() {
@@ -366,11 +400,21 @@
         }
 
         // --- 撲克牌 DOM 生成且完全貼合 (1:1.4 黃金比例填滿) ---
+        function getCardImagePath(suitCode, valueStr) {
+            const suitObj = suits.find(s => s.code === suitCode);
+            const suitName = suitObj.engName; // club, diamond, heart, spade
+            let valName = valueStr.toLowerCase();
+            if (valName === 'a') valName = '1';
+            if (valName === 'j') valName = 'jack';
+            if (valName === 'q') valName = 'queen';
+            if (valName === 'k') valName = 'king';
+            return `./cards/${suitName}_${valName}.png`;
+        }
+
         function generateCardImageHTML(suitCode, valueStr) {
             const key = `${suitCode}_${valueStr}`;
             const cacheItem = imageCache[key];
 
-            // 1. 如果預載已確定此卡圖片失效，直接在毫秒級渲染乾淨的備份 SVG
             if (cacheItem && cacheItem.status === 'failed') {
                 return `
                     <div class="w-full h-full bg-white rounded-2xl shadow-lg flex items-center justify-center overflow-hidden">
@@ -379,15 +423,7 @@
                 `;
             }
 
-            // 2. 如果預載成功，使用快取成功的圖片並以全比例填滿 w-full h-full，完全消除外圍多餘白邊
-            const suitObj = suits.find(s => s.code === suitCode);
-            const suitName = suitObj.engName; // club, diamond, heart, spade
-            let valName = valueStr.toLowerCase();
-            if (valName === 'a') valName = '1';
-            if (valName === 'j') valName = 'jack';
-            if (valName === 'q') valName = 'queen';
-            if (valName === 'k') valName = 'king';
-            const imgSrc = `./cards/${suitName}_${valName}.png`;
+            const imgSrc = getCardImagePath(suitCode, valueStr);
 
             return `
                 <img src="${imgSrc}" 
@@ -397,25 +433,24 @@
             `;
         }
 
-        // --- 全牌組快取與解碼引擎 ---
+        // --- 全牌組快取、解碼與 GPU 保溫庫 ---
         function startPreloadingAllCards() {
             let loadedCount = 0;
             const totalCards = 52;
             
+            // 建立 GPU 保溫庫容器內容
+            gpuCardVault.innerHTML = "";
+
             suits.forEach(s => {
                 values.forEach(v => {
-                    const suitName = s.engName;
-                    let valName = v.toLowerCase();
-                    if (valName === 'a') valName = '1';
-                    if (valName === 'j') valName = 'jack';
-                    if (valName === 'q') valName = 'queen';
-                    if (valName === 'k') valName = 'king';
-
                     const key = `${s.code}_${v}`;
-                    const src = `./cards/${suitName}_${valName}.png`;
+                    const src = getCardImagePath(s.code, v);
                     
                     const img = new Image();
                     img.src = src;
+                    img.className = "w-1 h-1 inline-block"; // 強迫 Safari 渲染微小像素以生成 GPU Texture 快取
+                    gpuCardVault.appendChild(img);
+
                     img.onload = () => {
                         imageCache[key] = { status: 'success', src: src };
                         checkProgress();
@@ -438,9 +473,9 @@
             }
         }
 
-        // --- 核心強迫算法算牌 (連鎖機制) ---
-        // 1. 月份為數字，日期除以 4：餘 1 為梅花(C)、餘 2 為紅磚(D)、餘 3 為紅心(H)、餘 0(整除) 為黑桃(S)。點數為當前月份。
-        // 2. 第二位之後的觀眾則為前一位數字加 5 (大於13則減13)，花色依 黑桃(S) ➔ 方塊/紅磚(D) ➔ 梅花(C) ➔ 愛心(H) ➔ 黑桃(S) 的循環。
+        // --- 核心強迫算法算牌 (多人連鎖機制) ---
+        // 1號觀眾：月份為數字（月份對應卡牌 1~12），日期除以4餘數決定花色。
+        // 後續觀眾：數字前一位加5，花色依照「黑桃-紅磚-梅花-愛心」遞迴循環。
         function calculateForcedCardByOrder(order) {
             const today = new Date();
             const month = today.getMonth() + 1; // 1 to 12
@@ -489,7 +524,32 @@
             return { suit: nextSuit, value: nextValue };
         }
 
-        // --- 洗牌陣列控制 ---
+        // --- 核心：動態推算下一個單人強迫牌 ---
+        function calculateNextForceCard(currentCard) {
+            const suitCycle = ['H', 'S', 'D', 'C'];
+            const currentSuitIndex = suitCycle.indexOf(currentCard.suit);
+            const nextSuit = suitCycle[(currentSuitIndex + 1) % 4];
+
+            const valueMap = {
+                'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
+                '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13
+            };
+            const revValueMap = {
+                1: 'A', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7',
+                8: '8', 9: '9', 10: '10', 11: 'J', 12: 'Q', 13: 'K'
+            };
+
+            const currentValNum = valueMap[currentCard.value];
+            let nextValNum = currentValNum + 5;
+            if (nextValNum > 13) {
+                nextValNum -= 13;
+            }
+            const nextValue = revValueMap[nextValNum];
+
+            return { suit: nextSuit, value: nextValue };
+        }
+
+        // --- 洗牌與不重複卡庫機制 ---
         function initAndShuffleDeck() {
             state.deck = [];
             suits.forEach(s => {
@@ -507,6 +567,7 @@
             }
         }
 
+        // 抽取下一張隨機牌
         function drawNextCard() {
             if (state.deck.length === 0) {
                 initAndShuffleDeck();
@@ -529,7 +590,7 @@
             slotActive.style.transition = `transform ${slideTime}ms ${easeCurve}`;
             slotIncoming.style.transition = `transform ${slideTime}ms ${easeCurve}`;
 
-            slotActive.offsetHeight; // 強制重繪
+            slotActive.offsetHeight; 
 
             slotActive.style.transform = 'translate3d(-100%, 0, 0)';
             slotIncoming.style.transform = 'translate3d(0, 0, 0)';
@@ -557,9 +618,11 @@
             if (state.status !== 'flashing') return;
 
             if (state.stopping) {
-                // 如果是迫牌模式（觀眾端 ➔ Phase 3、魔術師端 ➔ Force Mode 啟用）
-                if ((state.role === 'audience' && state.phase === 3) || 
-                    (state.role === 'magician' && state.magicianForceMode)) {
+                const isForced = (state.role === 'audience' && state.phase === 3) || 
+                                 (state.role === 'magician' && state.magicianForceMode) ||
+                                 (state.role === 'solo' && state.phase >= 3);
+
+                if (isForced) {
                     slideToNext(state.forceCard, true);
                 } else {
                     const finalRandomCard = drawNextCard();
@@ -616,7 +679,8 @@
             impactWave.classList.add('animate-impact');
 
             const isForcedStop = (state.role === 'audience' && state.phase === 3) || 
-                                (state.role === 'magician' && state.magicianForceMode);
+                                 (state.role === 'magician' && state.magicianForceMode) ||
+                                 (state.role === 'solo' && state.phase >= 3);
 
             if (isForcedStop) {
                 cardGlow.className = "absolute w-72 h-[380px] bg-amber-500/35 rounded-2xl blur-3xl opacity-100 transition-all duration-300";
@@ -625,13 +689,13 @@
                 cardGlow.className = "absolute w-72 h-[380px] bg-red-600/15 rounded-2xl blur-3xl opacity-100 transition-all duration-300";
             }
 
-            // 觀眾點擊停牌之後直接鎖定螢幕，無法再點
+            // 觀眾點擊停牌之後直接鎖定螢幕
             if (state.role === 'audience' && state.phase === 3) {
                 state.status = 'locked'; 
             }
         }
 
-        // 階段與輪遞控制
+        // 階段控制與連鎖輪遞
         function proceedToNextPhase() {
             if (state.role === 'audience') {
                 if (state.phase === 1) {
@@ -643,8 +707,24 @@
                     state.status = 'idle';
                     startFlashing();
                 }
+            } else if (state.role === 'solo') {
+                if (state.phase === 1) {
+                    state.phase = 2;
+                    state.status = 'idle';
+                    startFlashing();
+                } else if (state.phase === 2) {
+                    state.phase = 3;
+                    state.status = 'idle';
+                    startFlashing();
+                } else if (state.phase >= 3) {
+                    // 單人現場版連鎖公式遞推
+                    state.forceCard = calculateForcedCardByOrder(state.phase - 1);
+                    state.phase++;
+                    state.status = 'idle';
+                    cardOuter.className = "relative w-64 h-[358px] bg-neutral-950/90 border border-white/10 rounded-2xl card-pulse flex items-center justify-center transition-all duration-300 overflow-hidden";
+                    startFlashing();
+                }
             } else {
-                // 魔術師端：在非迫牌模式下可無限示範隨機。若在迫牌模式下，點擊第一張與第一位觀眾一樣規則，第二張與第二位一樣，以此類推。
                 if (state.magicianForceMode) {
                     state.magicianForceIndex++;
                     state.forceCard = calculateForcedCardByOrder(state.magicianForceIndex);
@@ -655,7 +735,7 @@
             }
         }
 
-        // 重置為 Ready 畫面
+        // 重新初始化 Ready 卡背
         function resetApp() {
             state.phase = 0;
             state.status = 'idle';
@@ -682,13 +762,13 @@
             cardGlow.className = "absolute w-72 h-[380px] bg-red-600/5 rounded-2xl blur-3xl transition-all duration-1000 opacity-50";
         }
 
-        // 全螢幕點擊路由
+        // 全螢幕點擊
         function handleGlobalInteraction() {
             if (state.role === 'audience' && state.status === 'locked') return;
             if (!magicianModal.classList.contains('hidden')) return;
 
             if (state.status === 'idle') {
-                if (state.role === 'audience' && state.phase === 0) {
+                if ((state.role === 'audience' || state.role === 'solo') && state.phase === 0) {
                     state.phase = 1; 
                 }
                 startFlashing();
@@ -709,6 +789,22 @@
         // ================================================================= -->
 
         async function setupRoomConnections() {
+            // 如果未開啟 Firebase (防黑屏萬用防禦措施)
+            if (!firebaseEnabled) {
+                state.role = 'solo';
+                state.forceCard = calculateForcedCardByOrder(1);
+                magicStage.classList.remove('hidden');
+                magicHotspot.classList.remove('hidden'); 
+                startPreloadingAllCards();
+                return;
+            }
+
+            // 安全防線：確保 Firestore 在有驗證用戶時才執行 (RULE 3)
+            if (!auth.currentUser) {
+                console.warn("未檢測到登入帳號，正在等待驗證...");
+                return;
+            }
+
             const urlParams = new URLSearchParams(window.location.search);
             const rId = urlParams.get('room');
 
@@ -745,10 +841,8 @@
                         }
                     });
 
-                    // 依據觀眾順序，自動秘密綁定預估要強迫拿到的目標牌
                     state.forceCard = calculateForcedCardByOrder(state.userOrder);
                     
-                    // 顯示引導介面
                     audienceOrderId.innerText = state.userOrder;
                     audienceIntroPanel.classList.remove('hidden');
 
@@ -771,7 +865,6 @@
                 state.roomId = 'R-' + Math.floor(1000 + Math.random() * 9000); 
 
                 state.forceCard = calculateForcedCardByOrder(1);
-
                 magicHotspot.classList.remove('hidden');
 
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', state.roomId);
@@ -813,27 +906,46 @@
             startPreloadingAllCards();
         }
 
-        // 監聽並確保在執行任何 Firestore 查詢前已登入完畢 (解決權限不足問題)
-        onAuthStateChanged(auth, async (user) => {
-            if (!user) {
+        // 啟動主流程並確保驗證首要完成 (RULE 3 & 錯誤降級防線)
+        const startApp = async () => {
+            if (firebaseEnabled) {
                 try {
+                    // 1. 先執行匿名/自訂 token 登入 (RULE 3)
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                         await signInWithCustomToken(auth, __initial_auth_token);
                     } else {
                         await signInAnonymously(auth);
                     }
+
+                    // 2. 登入成功後開始監聽狀態並連線
+                    onAuthStateChanged(auth, (user) => {
+                        if (user) {
+                            state.userId = user.uid;
+                            setupRoomConnections();
+                        } else {
+                            // 降級退回
+                            state.role = 'solo';
+                            firebaseEnabled = false;
+                            setupRoomConnections();
+                        }
+                    });
                 } catch (e) {
-                    console.error("驗證失敗，嘗試使用匿名登入:", e);
-                    await signInAnonymously(auth);
+                    // 若 Firebase 專案未啟用匿名登入 (auth/configuration-not-found) 或發生其他設定錯誤
+                    console.error("Firebase 驗證失敗 (可能未於控制台啟用『匿名登入』)，已自動安全退回『單人離線模式』運行:", e);
+                    firebaseEnabled = false;
+                    state.role = 'solo';
+                    setupRoomConnections();
                 }
             } else {
-                state.userId = user.uid;
                 setupRoomConnections();
             }
-        });
+        };
+
+        // 開始運行
+        startApp();
 
 
-        // --- 按鈕事件 ---
+        // --- 基本 UI 事件 ---
 
         audienceReadyBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -850,7 +962,7 @@
         });
 
 
-        // --- 魔術師秘密長按設定、重設與「迫牌同步模式」控制 ---
+        // --- 魔術師秘密長按選單控制 ---
 
         let pressTimer = null;
         const PRESS_DURATION = 1000; 
@@ -865,10 +977,8 @@
                 } else if (state.status === 'finished' || state.phase > 0) {
                     resetApp();
                 } else if (state.status === 'flashing') {
-                    // 高速輪播滾動時長按隱形熱區：開啟魔術師迫牌模式
                     state.magicianForceMode = !state.magicianForceMode;
                     if (state.magicianForceMode) {
-                        // 強制套用與對應順位觀眾相同的規則牌
                         state.forceCard = calculateForcedCardByOrder(state.magicianForceIndex);
                     }
                     playHeavyTick();
