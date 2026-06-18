@@ -139,7 +139,7 @@
     </div>
 
     <!-- ================================================================= -->
-    <!-- 流程 2 & 3 & 4：核心卡牌展示主舞台 -->
+    <!-- 核心卡牌展示主舞台 -->
     <!-- ================================================================= -->
     <main id="magic-stage" class="flex flex-col items-center justify-center w-full max-w-sm hidden">
 
@@ -151,6 +151,9 @@
             <!-- 卡牌外框容器 (黃金比例 1:1.40) -->
             <div id="card-outer" class="relative w-64 h-[358px] bg-neutral-950/90 border border-white/10 rounded-2xl card-pulse flex items-center justify-center transition-all duration-300 overflow-hidden">
                 
+                <!-- 畫面左上角不起眼的灰色 M 標記 (隨機模式顯現，迫牌模式醒目提示) -->
+                <div id="magician-indicator" class="absolute top-3 left-3 text-[11px] font-mono text-neutral-600/35 select-none hidden z-30">M</div>
+
                 <!-- 內層雙槽卡牌滑動通道 -->
                 <div id="card-content" class="w-full h-full relative rounded-2xl overflow-hidden will-change-transform bg-transparent">
                     
@@ -186,7 +189,7 @@
     <!-- ================= 畫面最左上角：極隱密微弱 M 狀態標記 (防穿幫) ================= -->
     <div id="magician-indicator" class="absolute top-4 left-4 text-[11px] font-mono text-neutral-600/25 select-none hidden z-50 pointer-events-none">M</div>
 
-    <!-- ================= 流程 5：右下角極隱密長按設定與重設熱區 (僅限魔術師) ================= -->
+    <!-- ================= 流程 5：右下角極隱密長按切換熱區 (僅限魔術師) ================= -->
     <div id="magic-hotspot" class="absolute bottom-0 right-0 w-24 h-24 opacity-0 z-50 cursor-default hidden"></div>
 
     <!-- 背景極微弱動態網格 -->
@@ -217,7 +220,7 @@
             roomId: '',
             userId: '',
             userOrder: 0, 
-            status: 'idle', // 'idle' (等待點擊), 'flashing' (滾動中), 'finished' (定格), 'locked' (觀眾鎖死)
+            status: 'idle', // 'idle' (等待點擊), 'flashing' (滾動中), 'finished' (定格), 'locked' (觀眾永久鎖死)
             normalSpeed: 220, 
             forceCard: null, 
             magicianForceMode: false, // 流程 5：魔術師迫牌模式開關
@@ -231,7 +234,7 @@
 
         const appId = 'default-magic-id';
         
-        // --- Firebase Config 帳號連線 ---
+        // --- 核心：直連並綁定您的 Firebase Config 帳號 ---
         const firebaseConfig = {
             apiKey: "AIzaSyDx2VEGJJCEs_OcZELIU9woRdo3EfZoe6M",
             authDomain: "pickonecard.firebaseapp.com",
@@ -298,14 +301,14 @@
             if (state.role === 'magician' || state.role === 'solo') {
                 magicianIndicator.classList.remove('hidden');
                 if (state.magicianForceMode) {
-                    magicianIndicator.style.opacity = "1"; // 迫牌模式啟動：M 稍微明顯一點（魔術師自看）
+                    magicianIndicator.style.opacity = "1"; // 迫牌模式啟動：M 亮起黃色（僅魔術師可見）
                     magicianIndicator.style.color = "#fbbf24"; 
                 } else {
-                    magicianIndicator.style.opacity = "0.25"; // 隨機模式：極淡灰色陰影
+                    magicianIndicator.style.opacity = "0.25"; // 隨機模式：顯示不起眼灰色 M
                     magicianIndicator.style.color = "#525252";
                 }
             } else {
-                magicianIndicator.classList.add('hidden'); // 流程 3：觀眾端絕對隱藏
+                magicianIndicator.classList.add('hidden'); // 觀眾端絕對隱藏
             }
         }
 
@@ -394,19 +397,21 @@
         }
 
         // --- 核心連鎖遞迴演算法 ---
+        // 1號觀眾指定花色為日期的餘數規則：餘1為梅花，餘2為紅磚(♦)，餘3為紅心，餘0(整除)為黑桃。數字為當前月份。
+        // 後續觀眾：點數為前一位點數 +5 (若>13則減13)，花色遞推「黑桃(♠) ➔ 紅磚/方塊(♦) ➔ 梅花(♣) ➔ 愛心(♥) ➔ 黑桃(♠)」
         function calculateForcedCardByOrder(order) {
             const today = new Date();
-            const month = today.getMonth() + 1; 
-            const date = today.getDate();
+            const month = today.getMonth() + 1; // 當月
+            const date = today.getDate(); // 當天
 
             if (order === 1) {
                 const revValueMap = { 1:'A', 2:'2', 3:'3', 4:'4', 5:'5', 6:'6', 7:'7', 8:'8', 9:'9', 10:'10', 11:'J', 12:'Q', 13:'K' };
                 const valStr = revValueMap[month] || 'K';
                 const remainder = date % 4;
-                let suitStr = 'S'; 
-                if (remainder === 1) suitStr = 'C'; 
-                else if (remainder === 2) suitStr = 'D'; 
-                else if (remainder === 3) suitStr = 'H'; 
+                let suitStr = 'S'; // 餘0 ➔ 黑桃
+                if (remainder === 1) suitStr = 'C'; // 餘1 ➔ 梅花
+                else if (remainder === 2) suitStr = 'D'; // 餘2 ➔ 方塊/紅磚
+                else if (remainder === 3) suitStr = 'H'; // 餘3 ➔ 紅心
                 return { suit: suitStr, value: valStr };
             }
 
@@ -472,10 +477,13 @@
             if (state.status !== 'flashing') return;
 
             if (state.stopping) {
-                // 決定是否給予迫牌
+                // 決定停止時顯示的撲克牌
                 const isForced = (state.role === 'audience') || (state.role === 'magician' && state.magicianForceMode);
-                if (isForced) { slideToNext(state.forceCard, true); } 
-                else { slideToNext(drawNextCard(), true); }
+                if (isForced) { 
+                    slideToNext(state.forceCard, true); 
+                } else { 
+                    slideToNext(drawNextCard(), true); 
+                }
                 
                 setTimeout(() => { finalizeMagicStop(); }, Math.floor(state.normalSpeed * 0.85) + 20);
                 return;
@@ -521,45 +529,42 @@
                 cardGlow.className = "absolute w-72 h-[380px] bg-amber-500/35 rounded-2xl blur-3xl opacity-100 transition-all duration-300";
                 cardOuter.classList.add('border-amber-500/35');
             } else {
-                cardGlow.className = "absolute w-72 h-[380px] bg-red-600/15 rounded-2xl blur-3xl opacity-100 transition-all duration-300";
+                cardGlow.className = "absolute w-72 h-[380px] bg-red-600/15 rounded-2xl blur-3xl opacity-100 transition-all duration-3000";
             }
 
-            // 流程 4：觀眾點擊停牌之後，直接鎖定螢幕，再也無法點擊換牌
+            // 流程 4：觀眾點擊停牌之後，直接永久鎖定螢幕，無法再次點擊
             if (state.role === 'audience') {
                 state.status = 'locked'; 
             }
         }
 
-        // 流程 2 後半段：魔術師展示完定格後，點擊「還原卡背」以便示範下一輪
-        function resetToIdleCardBack() {
+        // 階段控制與連鎖輪遞
+        function proceedToNextFlashing() {
             if (state.role === 'magician' && state.magicianForceMode) {
-                // 流程 5：迫牌模式下，自動按順序累加下一個觀眾編號
+                // 流程 5：迫牌模式下，自動按順序累加並預備下一個觀眾編號
                 state.magicianForceIndex++;
                 state.forceCard = calculateForcedCardByOrder(state.magicianForceIndex);
             }
             state.status = 'idle';
             state.stopping = false;
             state.isTransitioning = false;
-
-            slotActive.innerHTML = '';
-            slotActive.appendChild(defaultCardUi);
-            defaultCardUi.classList.remove('hidden');
-
-            cardOuter.className = "relative w-64 h-[358px] bg-neutral-950/90 border border-white/10 rounded-2xl card-pulse flex items-center justify-center transition-all duration-300 overflow-hidden";
-            impactWave.classList.remove('animate-impact');
-            cardGlow.className = "absolute w-72 h-[380px] bg-red-600/5 rounded-2xl blur-3xl transition-all duration-1000 opacity-50";
+            
+            // 流程 2：不需要重置回 Ready 牌背，直接再度啟動快速滾動！
+            startFlashing();
         }
 
         // 全螢幕點擊控制器
         function handleGlobalInteraction() {
-            if (state.status === 'locked') return; // 流程 4：鎖定狀態防禦
+            // 流程 4：若為觀眾且已抽完牌（locked），則點擊事件徹底失效並鎖死
+            if (state.status === 'locked') return; 
 
             if (state.status === 'idle') {
-                startFlashing(); // 點擊：開始選牌 (滾動中)
+                startFlashing(); // 點擊：開始滾動撲克牌
             } else if (state.status === 'flashing') {
-                triggerInstantStop(); // 再次點擊：隨機或指定停一張
+                triggerInstantStop(); // 再次點擊：停牌 (隨機或指定迫牌)
             } else if (state.status === 'finished') {
-                resetToIdleCardBack(); // 魔術師專用：停牌完再次點擊，重設回卡背，準備下一次示範
+                // 流程 2 & 5：定格後再次點選，直接再度開滾，不再回到起始頁面
+                proceedToNextFlashing(); 
             }
         }
 
@@ -568,7 +573,7 @@
         });
 
         // ================================================================= -->
-        // 🔮 Firebase Firestore 多人同步配對 🔮
+        // 🔮 Firebase Firestore 多人即時配對同步 🔮
         // ================================================================= -->
         async function setupRoomConnections() {
             if (!firebaseEnabled) {
@@ -594,13 +599,14 @@
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', state.roomId);
                 
                 try {
+                    // 全新高效、無衝突的增量註冊，保障 Safari 的毫秒級響應
                     await runTransaction(db, async (transaction) => {
                         const roomDoc = await transaction.get(roomRef);
-                        if (!roomDoc.exists()) { alert("房間已關閉或不存在。"); return; }
+                        if (!roomDoc.exists()) { alert("房間不存在或已解散。"); return; }
 
                         let members = roomDoc.data().members || {};
                         if (!members[state.userId]) {
-                            // 流程 1：依照進入順序自動累加編號 (1, 2, 3...)
+                            // 計算並指派專屬進入序號
                             const orderIndex = Object.keys(members).length + 1;
                             members[state.userId] = { order: orderIndex, joinedAt: Date.now() };
                             transaction.update(roomRef, { members: members });
@@ -610,11 +616,22 @@
                         }
                     });
 
-                    // 流程 3：計算該序號對應的指定強迫牌
+                    // 綁定指定強迫牌
                     state.forceCard = calculateForcedCardByOrder(state.userOrder);
+                    
+                    // 顯示觀眾起始引導「請點擊準備開始」
                     audienceIntroPanel.classList.remove('hidden');
 
-                } catch (e) { console.error("加入房間失敗", e); }
+                } catch (e) { 
+                    console.error("加入房間失敗:", e); 
+                }
+
+                onSnapshot(roomRef, (snapshot) => {
+                    if (!snapshot.exists()) {
+                        resetApp();
+                        alert("房間已結束。");
+                    }
+                });
 
             } else {
                 // =============== 魔術師端 (Magician Mode) ===============
@@ -638,13 +655,19 @@
                         correctLevel: QRCode.CorrectLevel.H
                     });
 
+                    // 即時監聽配對人數，人數變更時即時跳動 (解決人數不增加的問題)
                     onSnapshot(roomRef, (snapshot) => {
                         if (snapshot.exists()) {
                             const data = snapshot.data();
-                            magicianOnlineCount.innerText = Object.keys(data.members || {}).length;
+                            const activeCount = Object.keys(data.members || {}).length;
+                            magicianOnlineCount.innerText = activeCount;
                         }
+                    }, (err) => {
+                        console.error("即時同步人數失敗:", err);
                     });
-                } catch (e) { console.error("建立房間失敗:", e); }
+                } catch (e) { 
+                    console.error("建立房間失敗:", e); 
+                }
             }
 
             startPreloadingAllCards();
@@ -654,16 +677,30 @@
         const startApp = async () => {
             if (firebaseEnabled) {
                 onAuthStateChanged(auth, (user) => {
-                    if (user) { state.userId = user.uid; setupRoomConnections(); } 
-                    else { state.role = 'solo'; firebaseEnabled = false; setupRoomConnections(); }
+                    if (user) { 
+                        state.userId = user.uid; 
+                        setupRoomConnections(); 
+                    } else { 
+                        state.role = 'solo'; 
+                        firebaseEnabled = false; 
+                        setupRoomConnections(); 
+                    }
                 });
                 try {
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                         await signInWithCustomToken(auth, __initial_auth_token); return;
                     }
                 } catch (e) {}
-                try { await signInAnonymously(auth); } catch (e) { firebaseEnabled = false; state.role = 'solo'; setupRoomConnections(); }
-            } else { setupRoomConnections(); }
+                try { 
+                    await signInAnonymously(auth); 
+                } catch (e) { 
+                    firebaseEnabled = false; 
+                    state.role = 'solo'; 
+                    setupRoomConnections(); 
+                }
+            } else { 
+                setupRoomConnections(); 
+            }
         };
 
         startApp();
@@ -679,6 +716,7 @@
             e.stopPropagation();
             magicianPairingPanel.classList.add('hidden');
             magicStage.classList.remove('hidden');
+            state.status = 'idle';
         });
 
         // --- 流程 5：魔術師右下角隱形按鍵長按選單切換 ---
@@ -687,15 +725,15 @@
             if (pressTimer) clearTimeout(pressTimer);
             pressTimer = setTimeout(() => {
                 playHeavyTick();
-                // 流程 5：切換「迫牌模式 / 隨機模式」
+                // 流程 5：無痕切換「迫牌模式 / 隨機模式」，絕對不回初始頁面
                 state.magicianForceMode = !state.magicianForceMode;
                 if (state.magicianForceMode) {
-                    state.magicianForceIndex = 1; // 迫牌模式重置，第一張跟1號觀眾一樣
+                    state.magicianForceIndex = 1; // 迫牌模式重置，第一張跟 1 號觀眾一樣
                     state.forceCard = calculateForcedCardByOrder(state.magicianForceIndex);
                 }
                 updateMagicianModeIndicator();
                 pressTimer = null;
-            }, 1000); // 長按 1 秒觸開關
+            }, 1000); 
         }
         function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
 
