@@ -151,6 +151,9 @@
             <!-- 卡牌外框容器 (黃金比例 1:1.40) -->
             <div id="card-outer" class="relative w-64 h-[358px] bg-neutral-950/90 border border-white/10 rounded-2xl card-pulse flex items-center justify-center transition-all duration-300 overflow-hidden">
                 
+                <!-- 畫面左上角不起眼的灰色 M 標記 (隨機模式顯現，迫牌模式隱藏) -->
+                <div id="magician-indicator" class="absolute top-3 left-3 text-[11px] font-mono text-neutral-600/35 select-none hidden z-30">M</div>
+
                 <!-- 內層雙槽卡牌滑動通道 -->
                 <div id="card-content" class="w-full h-full relative rounded-2xl overflow-hidden will-change-transform bg-transparent">
                     
@@ -249,7 +252,7 @@
     <!-- 背景極微弱動態網格 -->
     <div class="absolute inset-0 bg-[linear-gradient(to_right,#ffffff01_1px,transparent_1px),linear-gradient(to_bottom,#ffffff01_1px,transparent_1px)] bg-[size:60px_60px] pointer-events-none"></div>
 
-    <!-- 背景解碼保溫庫，解決 Safari 滑動圖片時可能產生的閃爍問題 -->
+    <!-- 背景解碼保溫庫 -->
     <div id="gpu-card-vault"></div>
 
     <!-- ================================================================= -->
@@ -338,6 +341,7 @@
         const forceSuitSelect = document.getElementById('force-suit');
         const forceValueSelect = document.getElementById('force-value');
         const gpuCardVault = document.getElementById('gpu-card-vault');
+        const magicianIndicator = document.getElementById('magician-indicator');
 
         // --- 震動回饋 ---
         function playTick() {
@@ -354,6 +358,20 @@
                     window.navigator.vibrate([25, 35, 10]);
                 }
             } catch(e){}
+        }
+
+        // --- 密報：魔術指示標誌（M）刷新器 ---
+        function updateMagicianModeIndicator() {
+            if (!magicianIndicator) return;
+            if (state.role === 'magician' || state.role === 'solo') {
+                if (state.magicianForceMode) {
+                    magicianIndicator.classList.add('hidden'); // 迫牌模式：消除標記
+                } else {
+                    magicianIndicator.classList.remove('hidden'); // 隨機模式：顯示不起眼的灰色 M
+                }
+            } else {
+                magicianIndicator.classList.add('hidden'); // 觀眾端：絕對不顯示
+            }
         }
 
         // --- SVG 備份渲染器 ---
@@ -391,7 +409,7 @@
                         <text x="0" y="34" font-size="15" fill="${colorClass}" text-anchor="middle">${suitChar}</text>
                     </g>
                     <g transform="translate(184, 266) rotate(180)">
-                        <text x="0" y="18" font-size="22" font-weight="900" fill="${colorClass}" text-anchor="middle">${valueStr}</text>
+                        <text x="0" y="18" font-size="22" font-weight="900" fill="${colorClass}" text-anchor="middle">${suitChar}</text>
                         <text x="0" y="34" font-size="15" fill="${colorClass}" text-anchor="middle">${suitChar}</text>
                     </g>
                     ${centerGraphics}
@@ -760,6 +778,8 @@
             impactWave.classList.remove('animate-impact');
             
             cardGlow.className = "absolute w-72 h-[380px] bg-red-600/5 rounded-2xl blur-3xl transition-all duration-1000 opacity-50";
+            
+            updateMagicianModeIndicator();
         }
 
         // 全螢幕點擊
@@ -796,6 +816,7 @@
                 magicStage.classList.remove('hidden');
                 magicHotspot.classList.remove('hidden'); 
                 startPreloadingAllCards();
+                updateMagicianModeIndicator();
                 return;
             }
 
@@ -904,34 +925,41 @@
             }
 
             startPreloadingAllCards();
+            updateMagicianModeIndicator();
         }
 
-        // 啟動主流程並確保驗證首要完成 (RULE 3 & 錯誤降級防線)
+        // 啟動主流程並確保驗證首要完成 (RULE 3 & 獨立錯誤降級防線)
         const startApp = async () => {
             if (firebaseEnabled) {
+                // 1. 先安全設定監聽器，只要登入狀態一改變就開始同步連線
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        state.userId = user.uid;
+                        setupRoomConnections();
+                    } else {
+                        // 降級退回離線單人模式，保證畫面絕不全黑
+                        state.role = 'solo';
+                        firebaseEnabled = false;
+                        setupRoomConnections();
+                    }
+                });
+
+                // 2. 獨立捕獲 Token 登入錯誤
                 try {
-                    // 1. 先執行匿名/自訂 token 登入 (RULE 3)
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                         await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
+                        return; // 成功即返回
                     }
-
-                    // 2. 登入成功後開始監聽狀態並連線
-                    onAuthStateChanged(auth, (user) => {
-                        if (user) {
-                            state.userId = user.uid;
-                            setupRoomConnections();
-                        } else {
-                            // 降級退回
-                            state.role = 'solo';
-                            firebaseEnabled = false;
-                            setupRoomConnections();
-                        }
-                    });
                 } catch (e) {
-                    // 若 Firebase 專案未啟用匿名登入 (auth/configuration-not-found) 或發生其他設定錯誤
-                    console.error("Firebase 驗證失敗 (可能未於控制台啟用『匿名登入』)，已自動安全退回『單人離線模式』運行:", e);
+                    console.warn("Custom Token 驗證失敗，轉為嘗試匿名登入:", e);
+                }
+
+                // 3. 獨立捕獲 匿名登入錯誤
+                try {
+                    await signInAnonymously(auth);
+                } catch (e) {
+                    // 若 Firebase 驗證失敗，將平滑降級進入安全離線單人模式
+                    console.warn("Firebase 驗證失敗 (可能是 auth/configuration-not-found)，已自動安全退回『單人離線模式』運行:", e);
                     firebaseEnabled = false;
                     state.role = 'solo';
                     setupRoomConnections();
@@ -973,15 +1001,16 @@
                 playHeavyTick();
                 
                 if (state.phase === 0 && state.status === 'idle') {
+                    // 在初始狀態且還沒開始時，長按打開設定選單
                     openMagicianModal();
-                } else if (state.status === 'finished' || state.phase > 0) {
-                    resetApp();
-                } else if (state.status === 'flashing') {
+                } else {
+                    // 在任何已開始、進行中或完成狀態下，長按只切換「迫牌模式 / 隨機模式」，絕對不返回初始畫面
                     state.magicianForceMode = !state.magicianForceMode;
                     if (state.magicianForceMode) {
+                        state.magicianForceIndex = 1; // 重設為第一張牌
                         state.forceCard = calculateForcedCardByOrder(state.magicianForceIndex);
                     }
-                    playHeavyTick();
+                    updateMagicianModeIndicator();
                 }
                 pressTimer = null;
             }, PRESS_DURATION);
