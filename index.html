@@ -98,14 +98,17 @@
 <body id="interactive-screen" class="min-h-screen text-gray-100 flex flex-col justify-center items-center p-6 select-none relative cursor-pointer">
 
     <!-- ================================================================= -->
-    <!-- 魔術師房間配對階段 (QR Code 掃描) -->
+    <!-- 流程 1：魔術師房間配對階段 (起始即顯現的 QR Code 畫面) -->
     <!-- ================================================================= -->
     <div id="magician-pairing-panel" class="w-full max-w-sm flex flex-col items-center bg-neutral-900/40 border border-white/5 rounded-3xl p-6 backdrop-blur-md hidden z-30">
         <h2 class="text-amber-500 font-bold tracking-widest text-lg magic-title mb-4 text-center">CONNECTING REALMS</h2>
         
         <!-- 二維碼產生地 -->
-        <div class="bg-white p-3 rounded-2xl shadow-2xl mb-4 flex items-center justify-center">
-            <div id="qrcode"></div>
+        <div class="bg-white p-3 rounded-2xl shadow-2xl mb-4 flex items-center justify-center min-w-[224px] min-h-[224px]">
+            <div id="qrcode" class="flex flex-col items-center justify-center text-neutral-900 text-xs font-bold tracking-widest gap-2">
+                <i data-lucide="loader-2" class="w-6 h-6 animate-spin text-amber-600"></i>
+                喚醒傳送門中...
+            </div>
         </div>
 
         <p class="text-xs text-neutral-400 tracking-wider mb-6 text-center leading-relaxed">
@@ -119,17 +122,15 @@
     </div>
 
     <!-- ================================================================= -->
-    <!-- 觀眾開場引導階段 (已移除任何編號暗示，心理學高度隱蔽) -->
+    <!-- 流程 3：觀眾開場引導階段 -->
     <!-- ================================================================= -->
     <div id="audience-intro-panel" class="w-full max-w-xs flex flex-col items-center text-center bg-neutral-900/30 border border-white/5 rounded-3xl p-6 backdrop-blur-md hidden z-30">
         <div class="w-16 h-16 rounded-full border border-red-800/40 flex items-center justify-center mb-6">
             <i data-lucide="scan-face" class="w-8 h-8 text-red-600 animate-pulse"></i>
         </div>
         
-        <!-- 完全移除編號顯示，對外表現為純粹獨立抽牌說明 -->
         <h3 id="audience-welcome-text" class="text-base text-gray-300 leading-relaxed mb-6 font-semibold">
-            等等請點擊選擇一張牌，<br>請點擊準備開始。
-            <span id="audience-order-id" class="hidden">--</span>
+            請點擊準備開始。
         </h3>
 
         <button id="audience-ready-btn" class="w-full py-3 bg-gradient-to-b from-red-600 to-rose-800 text-white font-bold text-sm rounded-xl tracking-widest magic-title transition-all active:scale-95">
@@ -138,11 +139,10 @@
     </div>
 
     <!-- ================================================================= -->
-    <!-- 核心卡牌展示主舞台 (魔術師端 & 觀眾端共用) -->
+    <!-- 流程 2 & 3 & 4：核心卡牌展示主舞台 -->
     <!-- ================================================================= -->
     <main id="magic-stage" class="flex flex-col items-center justify-center w-full max-w-sm hidden">
 
-        <!-- 撲克牌展示區域 -->
         <div id="click-trigger-area" class="relative flex flex-col items-center justify-center pointer-events-none">
             
             <!-- 卡牌後方的霓虹光暈 -->
@@ -151,15 +151,12 @@
             <!-- 卡牌外框容器 (黃金比例 1:1.40) -->
             <div id="card-outer" class="relative w-64 h-[358px] bg-neutral-950/90 border border-white/10 rounded-2xl card-pulse flex items-center justify-center transition-all duration-300 overflow-hidden">
                 
-                <!-- 畫面左上角不起眼的灰色 M 標記 (隨機模式顯現，迫牌模式隱藏) -->
-                <div id="magician-indicator" class="absolute top-3 left-3 text-[11px] font-mono text-neutral-600/35 select-none hidden z-30">M</div>
-
                 <!-- 內層雙槽卡牌滑動通道 -->
                 <div id="card-content" class="w-full h-full relative rounded-2xl overflow-hidden will-change-transform bg-transparent">
                     
                     <!-- 卡牌槽 A (目前展示中) -->
                     <div id="slot-active" class="absolute inset-0 w-full h-full flex items-center justify-center translate-x-0 will-change-transform p-0">
-                        <!-- 預設開場 Ready 樣式 -->
+                        <!-- 預設開場 Ready 卡背樣式 -->
                         <div id="default-card-ui" class="w-full h-full flex flex-col items-center justify-center border-[3px] border-red-950/80 rounded-2xl bg-gradient-to-b from-neutral-950 via-red-950 to-neutral-950 p-4 relative overflow-hidden shadow-2xl">
                             <div class="absolute inset-0 opacity-15 bg-[radial-gradient(#ff0000_1px,transparent_1px)] [background-size:12px_12px]"></div>
                             
@@ -186,68 +183,11 @@
 
     </main>
 
-    <!-- ================= 右下角極隱密長按設定與重設熱區 (僅限魔術師) ================= -->
+    <!-- ================= 畫面最左上角：極隱密微弱 M 狀態標記 (防穿幫) ================= -->
+    <div id="magician-indicator" class="absolute top-4 left-4 text-[11px] font-mono text-neutral-600/25 select-none hidden z-50 pointer-events-none">M</div>
+
+    <!-- ================= 流程 5：右下角極隱密長按設定與重設熱區 (僅限魔術師) ================= -->
     <div id="magic-hotspot" class="absolute bottom-0 right-0 w-24 h-24 opacity-0 z-50 cursor-default hidden"></div>
-
-    <!-- ================= 魔術師設定後台面版 (全螢幕暗黑玻璃彈窗) ================= -->
-    <div id="magician-modal" class="fixed inset-0 bg-black/95 backdrop-blur-lg flex items-center justify-center p-6 z-50 hidden opacity-0 transition-opacity duration-300">
-        <div class="bg-neutral-900/95 border border-white/10 rounded-2xl w-full max-w-xs p-6 shadow-2xl relative">
-            
-            <div class="flex justify-between items-center pb-3 border-b border-white/10 mb-6">
-                <div class="flex items-center gap-2">
-                    <i data-lucide="sliders" class="text-amber-500"></i>
-                    <h3 class="text-sm font-bold tracking-wider text-amber-500">魔術師配對設定</h3>
-                </div>
-            </div>
-
-            <!-- 強迫牌自訂設定 -->
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">設定首張強迫牌 (1號觀眾)</label>
-                    <div class="grid grid-cols-2 gap-3">
-                        <!-- 花色選擇 -->
-                        <div>
-                            <span class="text-[10px] text-gray-500 block mb-1">花色 (Suit)</span>
-                            <select id="force-suit" class="w-full bg-neutral-950 border border-white/10 rounded-lg px-2 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
-                                <option value="H" selected>紅心 (heart)</option>
-                                <option value="D">方塊 (diamond)</option>
-                                <option value="S">黑桃 (spade)</option>
-                                <option value="C">梅花 (club)</option>
-                            </select>
-                        </div>
-                        <!-- 點數選擇 -->
-                        <div>
-                            <span class="text-[10px] text-gray-500 block mb-1">點數 (Value)</span>
-                            <select id="force-value" class="w-full bg-neutral-950 border border-white/10 rounded-lg px-2 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500">
-                                <option value="A">A (1)</option>
-                                <option value="2">2</option>
-                                <option value="3">3</option>
-                                <option value="4">4</option>
-                                <option value="5">5</option>
-                                <option value="6" selected>6</option>
-                                <option value="7">7</option>
-                                <option value="8">8</option>
-                                <option value="9">9</option>
-                                <option value="10">10</option>
-                                <option value="J">J (jack)</option>
-                                <option value="Q">Q (queen)</option>
-                                <option value="K">K (king)</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="text-[11px] text-neutral-500 leading-relaxed bg-black/30 p-2.5 rounded-lg border border-white/5">
-                    1號觀眾預設遵照日期餘數規則。此設定可用於覆蓋首張牌，第2張起自動按「加5」且花色「黑桃-紅磚-梅花-愛心」遞迴。
-                </div>
-
-                <!-- 確定完成按鈕 -->
-                <button id="settings-save-btn" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-neutral-950 font-bold text-xs tracking-wider rounded-lg transition-all duration-150">
-                    確認並離開
-                </button>
-            </div>
-        </div>
-    </div>
 
     <!-- 背景極微弱動態網格 -->
     <div class="absolute inset-0 bg-[linear-gradient(to_right,#ffffff01_1px,transparent_1px),linear-gradient(to_bottom,#ffffff01_1px,transparent_1px)] bg-[size:60px_60px] pointer-events-none"></div>
@@ -273,15 +213,14 @@
 
         // 魔術狀態機
         let state = {
-            role: 'solo', // 'magician', 'audience' 或 'solo' (安全離線備用網)
+            role: 'solo', 
             roomId: '',
             userId: '',
             userOrder: 0, 
-            phase: 0, 
-            status: 'idle', 
+            status: 'idle', // 'idle' (等待點擊), 'flashing' (滾動中), 'finished' (定格), 'locked' (觀眾鎖死)
             normalSpeed: 220, 
             forceCard: null, 
-            magicianForceMode: false, 
+            magicianForceMode: false, // 流程 5：魔術師迫牌模式開關
             magicianForceIndex: 1, 
             flashTimeout: null,
             currentDisplayCard: null,
@@ -290,9 +229,9 @@
             deck: []
         };
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-magic-id';
+        const appId = 'default-magic-id';
         
-        // --- 核心：直連並綁定您的 Firebase Config 帳號 ---
+        // --- Firebase Config 帳號連線 ---
         const firebaseConfig = {
             apiKey: "AIzaSyDx2VEGJJCEs_OcZELIU9woRdo3EfZoe6M",
             authDomain: "pickonecard.firebaseapp.com",
@@ -322,7 +261,6 @@
         const magicianOnlineCount = document.getElementById('magician-online-count');
         const closePairingBtn = document.getElementById('close-pairing-btn');
         const audienceIntroPanel = document.getElementById('audience-intro-panel');
-        const audienceOrderId = document.getElementById('audience-order-id');
         const audienceReadyBtn = document.getElementById('audience-ready-btn');
         const magicStage = document.getElementById('magic-stage');
         
@@ -336,41 +274,38 @@
         const preloaderStatusText = document.getElementById('preloader-status-text');
 
         const magicHotspot = document.getElementById('magic-hotspot');
-        const magicianModal = document.getElementById('magician-modal');
-        const settingsSaveBtn = document.getElementById('settings-save-btn');
-        const forceSuitSelect = document.getElementById('force-suit');
-        const forceValueSelect = document.getElementById('force-value');
         const gpuCardVault = document.getElementById('gpu-card-vault');
         const magicianIndicator = document.getElementById('magician-indicator');
 
+        // 先行判斷身份，若是魔術師，瞬間取消隱藏配對面板 (防止黑屏閃動)
+        const urlParams = new URLSearchParams(window.location.search);
+        const hasRoomParam = urlParams.get('room');
+        if (!hasRoomParam) {
+            magicianPairingPanel.classList.remove('hidden');
+        }
+
         // --- 震動回饋 ---
         function playTick() {
-            try {
-                if (window.navigator && window.navigator.vibrate) {
-                    window.navigator.vibrate(8);
-                }
-            } catch(e){}
+            try { if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(8); } catch(e){}
         }
-
         function playHeavyTick() {
-            try {
-                if (window.navigator && window.navigator.vibrate) {
-                    window.navigator.vibrate([25, 35, 10]);
-                }
-            } catch(e){}
+            try { if (window.navigator && window.navigator.vibrate) window.navigator.vibrate([25, 35, 10]); } catch(e){}
         }
 
-        // --- 密報：魔術指示標誌（M）刷新器 ---
+        // --- 密報：畫面最左上角指示標誌（M）隱密刷新器 ---
         function updateMagicianModeIndicator() {
             if (!magicianIndicator) return;
             if (state.role === 'magician' || state.role === 'solo') {
+                magicianIndicator.classList.remove('hidden');
                 if (state.magicianForceMode) {
-                    magicianIndicator.classList.add('hidden'); // 迫牌模式：消除標記
+                    magicianIndicator.style.opacity = "1"; // 迫牌模式啟動：M 稍微明顯一點（魔術師自看）
+                    magicianIndicator.style.color = "#fbbf24"; 
                 } else {
-                    magicianIndicator.classList.remove('hidden'); // 隨機模式：顯示不起眼的灰色 M
+                    magicianIndicator.style.opacity = "0.25"; // 隨機模式：極淡灰色陰影
+                    magicianIndicator.style.color = "#525252";
                 }
             } else {
-                magicianIndicator.classList.add('hidden'); // 觀眾端：絕對不顯示
+                magicianIndicator.classList.add('hidden'); // 流程 3：觀眾端絕對隱藏
             }
         }
 
@@ -392,13 +327,9 @@
                     <text x="100" y="185" font-size="28" fill="${colorClass}" text-anchor="middle" font-weight="bold">${valueStr}</text>
                 `;
             } else if (valueStr === 'A') {
-                centerGraphics = `
-                    <text x="100" y="165" font-size="75" fill="${colorClass}" text-anchor="middle">${suitChar}</text>
-                `;
+                centerGraphics = `<text x="100" y="165" font-size="75" fill="${colorClass}" text-anchor="middle">${suitChar}</text>`;
             } else {
-                centerGraphics = `
-                    <text x="100" y="160" font-size="52" fill="${colorClass}" text-anchor="middle">${suitChar}</text>
-                `;
+                centerGraphics = `<text x="100" y="160" font-size="52" fill="${colorClass}" text-anchor="middle">${suitChar}</text>`;
             }
 
             return `
@@ -417,10 +348,9 @@
             `;
         }
 
-        // --- 撲克牌 DOM 生成且完全貼合 (1:1.4 黃金比例填滿) ---
         function getCardImagePath(suitCode, valueStr) {
             const suitObj = suits.find(s => s.code === suitCode);
-            const suitName = suitObj.engName; // club, diamond, heart, spade
+            const suitName = suitObj.engName;
             let valName = valueStr.toLowerCase();
             if (valName === 'a') valName = '1';
             if (valName === 'j') valName = 'jack';
@@ -432,240 +362,133 @@
         function generateCardImageHTML(suitCode, valueStr) {
             const key = `${suitCode}_${valueStr}`;
             const cacheItem = imageCache[key];
-
             if (cacheItem && cacheItem.status === 'failed') {
-                return `
-                    <div class="w-full h-full bg-white rounded-2xl shadow-lg flex items-center justify-center overflow-hidden">
-                        ${generateCardSVG(suitCode, valueStr)}
-                    </div>
-                `;
+                return `<div class="w-full h-full bg-white rounded-2xl shadow-lg flex items-center justify-center overflow-hidden">${generateCardSVG(suitCode, valueStr)}</div>`;
             }
-
             const imgSrc = getCardImagePath(suitCode, valueStr);
-
-            return `
-                <img src="${imgSrc}" 
-                     alt="${suitCode}${valueStr}" 
-                     class="w-full h-full object-fill rounded-2xl pointer-events-none select-none" 
-                     onerror="this.onerror=null; this.outerHTML=generateCardSVG('${suitCode}', '${valueStr}')" />
-            `;
+            return `<img src="${imgSrc}" alt="${suitCode}${valueStr}" class="w-full h-full object-fill rounded-2xl pointer-events-none select-none" onerror="this.onerror=null; this.outerHTML=generateCardSVG('${suitCode}', '${valueStr}')" />`;
         }
 
-        // --- 全牌組快取、解碼與 GPU 保溫庫 ---
+        // --- 快取庫加載 ---
         function startPreloadingAllCards() {
             let loadedCount = 0;
             const totalCards = 52;
-            
-            // 建立 GPU 保溫庫容器內容
             gpuCardVault.innerHTML = "";
-
             suits.forEach(s => {
                 values.forEach(v => {
                     const key = `${s.code}_${v}`;
                     const src = getCardImagePath(s.code, v);
-                    
                     const img = new Image();
                     img.src = src;
-                    img.className = "w-1 h-1 inline-block"; // 強迫 Safari 渲染微小像素以生成 GPU Texture 快取
+                    img.className = "w-1 h-1 inline-block";
                     gpuCardVault.appendChild(img);
-
-                    img.onload = () => {
-                        imageCache[key] = { status: 'success', src: src };
-                        checkProgress();
-                    };
-                    img.onerror = () => {
-                        imageCache[key] = { status: 'failed' };
-                        checkProgress();
-                    };
+                    img.onload = () => { imageCache[key] = { status: 'success', src: src }; checkProgress(); };
+                    img.onerror = () => { imageCache[key] = { status: 'failed' }; checkProgress(); };
                 });
             });
-
             function checkProgress() {
                 loadedCount++;
-                if (loadedCount === totalCards) {
-                    preloaderStatusText.innerText = "tap to start";
-                } else {
-                    const percent = Math.floor((loadedCount / totalCards) * 100);
-                    preloaderStatusText.innerText = `READY ${percent}%`;
-                }
+                if (loadedCount === totalCards) { preloaderStatusText.innerText = "tap to start"; } 
+                else { preloaderStatusText.innerText = `READY ${Math.floor((loadedCount / totalCards) * 100)}%`; }
             }
         }
 
-        // --- 核心強迫算法算牌 (多人連鎖機制) ---
-        // 1號觀眾：月份為數字（月份對應卡牌 1~12），日期除以4餘數決定花色。
-        // 後續觀眾：數字前一位加5，花色依照「黑桃-紅磚-梅花-愛心」遞迴循環。
+        // --- 核心連鎖遞迴演算法 ---
         function calculateForcedCardByOrder(order) {
             const today = new Date();
-            const month = today.getMonth() + 1; // 1 to 12
+            const month = today.getMonth() + 1; 
             const date = today.getDate();
 
             if (order === 1) {
-                const revValueMap = {
-                    1: 'A', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7',
-                    8: '8', 9: '9', 10: '10', 11: 'J', 12: 'Q', 13: 'K'
-                };
+                const revValueMap = { 1:'A', 2:'2', 3:'3', 4:'4', 5:'5', 6:'6', 7:'7', 8:'8', 9:'9', 10:'10', 11:'J', 12:'Q', 13:'K' };
                 const valStr = revValueMap[month] || 'K';
-
                 const remainder = date % 4;
-                let suitStr = 'S'; // 餘0(整除) ➔ 黑桃
-                if (remainder === 1) suitStr = 'C'; // 餘1 ➔ 梅花
-                else if (remainder === 2) suitStr = 'D'; // 餘2 ➔ 方塊
-                else if (remainder === 3) suitStr = 'H'; // 餘3 ➔ 紅心
-
+                let suitStr = 'S'; 
+                if (remainder === 1) suitStr = 'C'; 
+                else if (remainder === 2) suitStr = 'D'; 
+                else if (remainder === 3) suitStr = 'H'; 
                 return { suit: suitStr, value: valStr };
             }
 
             const prevCard = calculateForcedCardByOrder(order - 1);
-            
-            // 花色遞歸循環：黑桃(S) ➔ 方塊/紅磚(D) ➔ 梅花(C) ➔ 愛心(H) ➔ 黑桃(S)
             const suitCycle = ['S', 'D', 'C', 'H'];
             const prevSuitIndex = suitCycle.indexOf(prevCard.suit);
             const nextSuit = suitCycle[(prevSuitIndex + 1) % 4];
 
-            // 點數遞推 (前一位點數加5)
-            const valueMap = {
-                'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
-                '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13
-            };
-            const revValueMap = {
-                1: 'A', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7',
-                8: '8', 9: '9', 10: '10', 11: 'J', 12: 'Q', 13: 'K'
-            };
-
-            const prevValNum = valueMap[prevCard.value];
-            let nextValNum = prevValNum + 5;
-            if (nextValNum > 13) {
-                nextValNum -= 13;
-            }
-            const nextValue = revValueMap[nextValNum];
-
-            return { suit: nextSuit, value: nextValue };
+            const valueMap = { 'A':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':7, '8':8, '9':9, '10':10, 'J':11, 'Q':12, 'K':13 };
+            const revValueMap = { 1:'A', 2:'2', 3:'3', 4:'4', 5:'5', 6:'6', 7:'7', 8:'8', 9:'9', 10:'10', 11:'J', 12:'Q', 13:'K' };
+            let nextValNum = valueMap[prevCard.value] + 5;
+            if (nextValNum > 13) nextValNum -= 13;
+            return { suit: nextSuit, value: revValueMap[nextValNum] };
         }
 
-        // --- 核心：動態推算下一個單人強迫牌 ---
-        function calculateNextForceCard(currentCard) {
-            const suitCycle = ['H', 'S', 'D', 'C'];
-            const currentSuitIndex = suitCycle.indexOf(currentCard.suit);
-            const nextSuit = suitCycle[(currentSuitIndex + 1) % 4];
-
-            const valueMap = {
-                'A': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
-                '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13
-            };
-            const revValueMap = {
-                1: 'A', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7',
-                8: '8', 9: '9', 10: '10', 11: 'J', 12: 'Q', 13: 'K'
-            };
-
-            const currentValNum = valueMap[currentCard.value];
-            let nextValNum = currentValNum + 5;
-            if (nextValNum > 13) {
-                nextValNum -= 13;
-            }
-            const nextValue = revValueMap[nextValNum];
-
-            return { suit: nextSuit, value: nextValue };
-        }
-
-        // --- 洗牌與不重複卡庫機制 ---
         function initAndShuffleDeck() {
             state.deck = [];
             suits.forEach(s => {
                 values.forEach(v => {
-                    if (state.forceCard && s.code === state.forceCard.suit && v === state.forceCard.value) {
-                        return;
-                    }
+                    if (state.forceCard && s.code === state.forceCard.suit && v === state.forceCard.value) return;
                     state.deck.push({ suit: s.code, value: v });
                 });
             });
-
             for (let i = state.deck.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [state.deck[i], state.deck[j]] = [state.deck[j], state.deck[i]];
             }
         }
 
-        // 抽取下一張隨機牌
         function drawNextCard() {
-            if (state.deck.length === 0) {
-                initAndShuffleDeck();
-            }
+            if (state.deck.length === 0) initAndShuffleDeck();
             return state.deck.pop();
         }
 
-        // --- 雙槽硬體加速滑動切換 ---
         function slideToNext(nextCardData, isFinal = false) {
             if (state.isTransitioning) return;
             state.isTransitioning = true;
 
             slotIncoming.innerHTML = generateCardImageHTML(nextCardData.suit, nextCardData.value);
-
             const slideTime = Math.floor(state.normalSpeed * 0.85);
-            const easeCurve = isFinal 
-                ? 'cubic-bezier(0.16, 1, 0.3, 1)' 
-                : 'cubic-bezier(0.25, 1, 0.5, 1)';
+            const easeCurve = isFinal ? 'cubic-bezier(0.16, 1, 0.3, 1)' : 'cubic-bezier(0.25, 1, 0.5, 1)';
 
             slotActive.style.transition = `transform ${slideTime}ms ${easeCurve}`;
             slotIncoming.style.transition = `transform ${slideTime}ms ${easeCurve}`;
-
             slotActive.offsetHeight; 
-
             slotActive.style.transform = 'translate3d(-100%, 0, 0)';
             slotIncoming.style.transform = 'translate3d(0, 0, 0)';
 
-            if (!isFinal) {
-                playTick();
-            }
+            if (!isFinal) playTick();
 
             setTimeout(() => {
                 slotActive.innerHTML = slotIncoming.innerHTML;
-                
                 slotActive.style.transition = 'none';
                 slotIncoming.style.transition = 'none';
-
                 slotActive.style.transform = 'translate3d(0, 0, 0)';
                 slotIncoming.style.transform = 'translate3d(100%, 0, 0)';
-                
                 state.currentDisplayCard = nextCardData;
                 state.isTransitioning = false;
             }, slideTime);
         }
 
-        // 遞迴輪播
         function runFlashLoop() {
             if (state.status !== 'flashing') return;
 
             if (state.stopping) {
-                const isForced = (state.role === 'audience' && state.phase === 3) || 
-                                 (state.role === 'magician' && state.magicianForceMode) ||
-                                 (state.role === 'solo' && state.phase >= 3);
-
-                if (isForced) {
-                    slideToNext(state.forceCard, true);
-                } else {
-                    const finalRandomCard = drawNextCard();
-                    slideToNext(finalRandomCard, true);
-                }
+                // 決定是否給予迫牌
+                const isForced = (state.role === 'audience') || (state.role === 'magician' && state.magicianForceMode);
+                if (isForced) { slideToNext(state.forceCard, true); } 
+                else { slideToNext(drawNextCard(), true); }
                 
-                const slideTime = Math.floor(state.normalSpeed * 0.85);
-                setTimeout(() => {
-                    finalizeMagicStop();
-                }, slideTime + 20);
+                setTimeout(() => { finalizeMagicStop(); }, Math.floor(state.normalSpeed * 0.85) + 20);
                 return;
             }
 
-            const nextCard = drawNextCard();
-            slideToNext(nextCard, false);
-
+            slideToNext(drawNextCard(), false);
             state.flashTimeout = setTimeout(runFlashLoop, state.normalSpeed);
         }
 
-        // 啟動快速滾動
         function startFlashing() {
             state.status = 'flashing';
             state.stopping = false;
             state.isTransitioning = false;
-
             initAndShuffleDeck();
             
             defaultCardUi.classList.add('hidden');
@@ -675,7 +498,6 @@
             const startCard = drawNextCard();
             slotActive.innerHTML = generateCardImageHTML(startCard.suit, startCard.value);
             state.currentDisplayCard = startCard;
-
             state.flashTimeout = setTimeout(runFlashLoop, state.normalSpeed);
         }
 
@@ -684,22 +506,17 @@
             state.stopping = true;
         }
 
-        // 定格處理
         function finalizeMagicStop() {
             state.status = 'finished';
             clearTimeout(state.flashTimeout);
             playHeavyTick();
-
             cardOuter.classList.remove('scale-105');
             
             impactWave.classList.remove('animate-impact');
             void impactWave.offsetWidth; 
             impactWave.classList.add('animate-impact');
 
-            const isForcedStop = (state.role === 'audience' && state.phase === 3) || 
-                                 (state.role === 'magician' && state.magicianForceMode) ||
-                                 (state.role === 'solo' && state.phase >= 3);
-
+            const isForcedStop = (state.role === 'audience') || (state.role === 'magician' && state.magicianForceMode);
             if (isForcedStop) {
                 cardGlow.className = "absolute w-72 h-[380px] bg-amber-500/35 rounded-2xl blur-3xl opacity-100 transition-all duration-300";
                 cardOuter.classList.add('border-amber-500/35');
@@ -707,95 +524,42 @@
                 cardGlow.className = "absolute w-72 h-[380px] bg-red-600/15 rounded-2xl blur-3xl opacity-100 transition-all duration-300";
             }
 
-            // 觀眾點擊停牌之後直接鎖定螢幕
-            if (state.role === 'audience' && state.phase === 3) {
+            // 流程 4：觀眾點擊停牌之後，直接鎖定螢幕，再也無法點擊換牌
+            if (state.role === 'audience') {
                 state.status = 'locked'; 
             }
         }
 
-        // 階段控制與連鎖輪遞
-        function proceedToNextPhase() {
-            if (state.role === 'audience') {
-                if (state.phase === 1) {
-                    state.phase = 2;
-                    state.status = 'idle';
-                    startFlashing();
-                } else if (state.phase === 2) {
-                    state.phase = 3;
-                    state.status = 'idle';
-                    startFlashing();
-                }
-            } else if (state.role === 'solo') {
-                if (state.phase === 1) {
-                    state.phase = 2;
-                    state.status = 'idle';
-                    startFlashing();
-                } else if (state.phase === 2) {
-                    state.phase = 3;
-                    state.status = 'idle';
-                    startFlashing();
-                } else if (state.phase >= 3) {
-                    // 單人現場版連鎖公式遞推
-                    state.forceCard = calculateForcedCardByOrder(state.phase - 1);
-                    state.phase++;
-                    state.status = 'idle';
-                    cardOuter.className = "relative w-64 h-[358px] bg-neutral-950/90 border border-white/10 rounded-2xl card-pulse flex items-center justify-center transition-all duration-300 overflow-hidden";
-                    startFlashing();
-                }
-            } else {
-                if (state.magicianForceMode) {
-                    state.magicianForceIndex++;
-                    state.forceCard = calculateForcedCardByOrder(state.magicianForceIndex);
-                }
-                state.status = 'idle';
-                cardOuter.className = "relative w-64 h-[358px] bg-neutral-950/90 border border-white/10 rounded-2xl card-pulse flex items-center justify-center transition-all duration-300 overflow-hidden";
-                startFlashing();
+        // 流程 2 後半段：魔術師展示完定格後，點擊「還原卡背」以便示範下一輪
+        function resetToIdleCardBack() {
+            if (state.role === 'magician' && state.magicianForceMode) {
+                // 流程 5：迫牌模式下，自動按順序累加下一個觀眾編號
+                state.magicianForceIndex++;
+                state.forceCard = calculateForcedCardByOrder(state.magicianForceIndex);
             }
-        }
-
-        // 重新初始化 Ready 卡背
-        function resetApp() {
-            state.phase = 0;
             state.status = 'idle';
             state.stopping = false;
             state.isTransitioning = false;
-            state.magicianForceMode = false;
-            state.magicianForceIndex = 1;
-            
-            state.forceCard = { suit: forceSuitSelect.value, value: forceValueSelect.value };
-
-            slotActive.style.transition = 'none';
-            slotIncoming.style.transition = 'none';
-            slotActive.style.transform = 'translate3d(0, 0, 0)';
-            slotIncoming.style.transform = 'translate3d(100%, 0, 0)';
 
             slotActive.innerHTML = '';
             slotActive.appendChild(defaultCardUi);
-            slotIncoming.innerHTML = '';
             defaultCardUi.classList.remove('hidden');
 
             cardOuter.className = "relative w-64 h-[358px] bg-neutral-950/90 border border-white/10 rounded-2xl card-pulse flex items-center justify-center transition-all duration-300 overflow-hidden";
             impactWave.classList.remove('animate-impact');
-            
             cardGlow.className = "absolute w-72 h-[380px] bg-red-600/5 rounded-2xl blur-3xl transition-all duration-1000 opacity-50";
-            
-            updateMagicianModeIndicator();
         }
 
-        // 全螢幕點擊
+        // 全螢幕點擊控制器
         function handleGlobalInteraction() {
-            if (state.role === 'audience' && state.status === 'locked') return;
-            if (!magicianModal.classList.contains('hidden')) return;
+            if (state.status === 'locked') return; // 流程 4：鎖定狀態防禦
 
             if (state.status === 'idle') {
-                if ((state.role === 'audience' || state.role === 'solo') && state.phase === 0) {
-                    state.phase = 1; 
-                }
-                startFlashing();
+                startFlashing(); // 點擊：開始選牌 (滾動中)
             } else if (state.status === 'flashing') {
-                triggerInstantStop();
+                triggerInstantStop(); // 再次點擊：隨機或指定停一張
             } else if (state.status === 'finished') {
-                proceedToNextPhase();
+                resetToIdleCardBack(); // 魔術師專用：停牌完再次點擊，重設回卡背，準備下一次示範
             }
         }
 
@@ -803,13 +567,10 @@
             handleGlobalInteraction();
         });
 
-
         // ================================================================= -->
-        // 🔮 Firebase Firestore 連線與雲端配對邏輯 🔮
+        // 🔮 Firebase Firestore 多人同步配對 🔮
         // ================================================================= -->
-
         async function setupRoomConnections() {
-            // 如果未開啟 Firebase (防黑屏萬用防禦措施)
             if (!firebaseEnabled) {
                 state.role = 'solo';
                 state.forceCard = calculateForcedCardByOrder(1);
@@ -820,20 +581,14 @@
                 return;
             }
 
-            // 安全防線：確保 Firestore 在有驗證用戶時才執行 (RULE 3)
-            if (!auth.currentUser) {
-                console.warn("未檢測到登入帳號，正在等待驗證...");
-                return;
-            }
+            if (!auth.currentUser) return;
 
-            const urlParams = new URLSearchParams(window.location.search);
             const rId = urlParams.get('room');
 
             if (rId) {
-                // =============== 觀眾連線端 (Audience Mode) ===============
+                // =============== 觀眾端 (Audience Mode) ===============
                 state.role = 'audience';
                 state.roomId = rId;
-
                 magicHotspot.classList.add('hidden');
 
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', state.roomId);
@@ -841,20 +596,13 @@
                 try {
                     await runTransaction(db, async (transaction) => {
                         const roomDoc = await transaction.get(roomRef);
-                        if (!roomDoc.exists()) {
-                            alert("房間已關閉或不存在。");
-                            return;
-                        }
+                        if (!roomDoc.exists()) { alert("房間已關閉或不存在。"); return; }
 
                         let members = roomDoc.data().members || {};
-                        
                         if (!members[state.userId]) {
+                            // 流程 1：依照進入順序自動累加編號 (1, 2, 3...)
                             const orderIndex = Object.keys(members).length + 1;
-                            members[state.userId] = {
-                                order: orderIndex,
-                                joinedAt: Date.now()
-                            };
-
+                            members[state.userId] = { order: orderIndex, joinedAt: Date.now() };
                             transaction.update(roomRef, { members: members });
                             state.userOrder = orderIndex;
                         } else {
@@ -862,44 +610,24 @@
                         }
                     });
 
+                    // 流程 3：計算該序號對應的指定強迫牌
                     state.forceCard = calculateForcedCardByOrder(state.userOrder);
-                    
-                    audienceOrderId.innerText = state.userOrder;
                     audienceIntroPanel.classList.remove('hidden');
 
-                } catch (e) {
-                    console.error("連線房間事務失敗", e);
-                }
-
-                onSnapshot(roomRef, (snapshot) => {
-                    if (!snapshot.exists()) {
-                        resetApp();
-                        alert("房間已結束。");
-                    }
-                }, (error) => {
-                    console.error("監聽房間失敗", error);
-                });
+                } catch (e) { console.error("加入房間失敗", e); }
 
             } else {
-                // =============== 魔術師控制端 (Magician Mode) ===============
+                // =============== 魔術師端 (Magician Mode) ===============
                 state.role = 'magician';
                 state.roomId = 'R-' + Math.floor(1000 + Math.random() * 9000); 
-
                 state.forceCard = calculateForcedCardByOrder(1);
                 magicHotspot.classList.remove('hidden');
 
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', state.roomId);
                 try {
-                    await setDoc(roomRef, {
-                        roomId: state.roomId,
-                        magicianId: state.userId,
-                        createdAt: Date.now(),
-                        members: {}
-                    });
-
+                    await setDoc(roomRef, { roomId: state.roomId, magicianId: state.userId, createdAt: Date.now(), members: {} });
                     const audienceURL = `${window.location.origin}${window.location.pathname}?room=${state.roomId}`;
                     
-                    magicianPairingPanel.classList.remove('hidden');
                     document.getElementById('qrcode').innerHTML = ""; 
                     new QRCode(document.getElementById('qrcode'), {
                         text: audienceURL,
@@ -913,163 +641,70 @@
                     onSnapshot(roomRef, (snapshot) => {
                         if (snapshot.exists()) {
                             const data = snapshot.data();
-                            const membersCount = Object.keys(data.members || {}).length;
-                            magicianOnlineCount.innerText = membersCount;
+                            magicianOnlineCount.innerText = Object.keys(data.members || {}).length;
                         }
-                    }, (err) => {
-                        console.error("監聽失敗", err);
                     });
-                } catch (e) {
-                    console.error("建立房間失敗:", e);
-                }
+                } catch (e) { console.error("建立房間失敗:", e); }
             }
 
             startPreloadingAllCards();
             updateMagicianModeIndicator();
         }
 
-        // 啟動主流程並確保驗證首要完成 (RULE 3 & 獨立錯誤降級防線)
         const startApp = async () => {
             if (firebaseEnabled) {
-                // 1. 先安全設定監聽器，只要登入狀態一改變就開始同步連線
                 onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        state.userId = user.uid;
-                        setupRoomConnections();
-                    } else {
-                        // 降級退回離線單人模式，保證畫面絕不全黑
-                        state.role = 'solo';
-                        firebaseEnabled = false;
-                        setupRoomConnections();
-                    }
+                    if (user) { state.userId = user.uid; setupRoomConnections(); } 
+                    else { state.role = 'solo'; firebaseEnabled = false; setupRoomConnections(); }
                 });
-
-                // 2. 獨立捕獲 Token 登入錯誤
                 try {
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                        return; // 成功即返回
+                        await signInWithCustomToken(auth, __initial_auth_token); return;
                     }
-                } catch (e) {
-                    console.warn("Custom Token 驗證失敗，轉為嘗試匿名登入:", e);
-                }
-
-                // 3. 獨立捕獲 匿名登入錯誤
-                try {
-                    await signInAnonymously(auth);
-                } catch (e) {
-                    // 若 Firebase 驗證失敗，將平滑降級進入安全離線單人模式
-                    console.warn("Firebase 驗證失敗 (可能是 auth/configuration-not-found)，已自動安全退回『單人離線模式』運行:", e);
-                    firebaseEnabled = false;
-                    state.role = 'solo';
-                    setupRoomConnections();
-                }
-            } else {
-                setupRoomConnections();
-            }
+                } catch (e) {}
+                try { await signInAnonymously(auth); } catch (e) { firebaseEnabled = false; state.role = 'solo'; setupRoomConnections(); }
+            } else { setupRoomConnections(); }
         };
 
-        // 開始運行
         startApp();
 
-
-        // --- 基本 UI 事件 ---
-
+        // UI 按鍵事件
         audienceReadyBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             audienceIntroPanel.classList.add('hidden');
             magicStage.classList.remove('hidden');
-            state.status = 'idle';
         });
 
         closePairingBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             magicianPairingPanel.classList.add('hidden');
             magicStage.classList.remove('hidden');
-            state.status = 'idle';
         });
 
-
-        // --- 魔術師秘密長按選單控制 ---
-
+        // --- 流程 5：魔術師右下角隱形按鍵長按選單切換 ---
         let pressTimer = null;
-        const PRESS_DURATION = 1000; 
-
         function startPress() {
             if (pressTimer) clearTimeout(pressTimer);
             pressTimer = setTimeout(() => {
                 playHeavyTick();
-                
-                if (state.phase === 0 && state.status === 'idle') {
-                    // 在初始狀態且還沒開始時，長按打開設定選單
-                    openMagicianModal();
-                } else {
-                    // 在任何已開始、進行中或完成狀態下，長按只切換「迫牌模式 / 隨機模式」，絕對不返回初始畫面
-                    state.magicianForceMode = !state.magicianForceMode;
-                    if (state.magicianForceMode) {
-                        state.magicianForceIndex = 1; // 重設為第一張牌
-                        state.forceCard = calculateForcedCardByOrder(state.magicianForceIndex);
-                    }
-                    updateMagicianModeIndicator();
+                // 流程 5：切換「迫牌模式 / 隨機模式」
+                state.magicianForceMode = !state.magicianForceMode;
+                if (state.magicianForceMode) {
+                    state.magicianForceIndex = 1; // 迫牌模式重置，第一張跟1號觀眾一樣
+                    state.forceCard = calculateForcedCardByOrder(state.magicianForceIndex);
                 }
+                updateMagicianModeIndicator();
                 pressTimer = null;
-            }, PRESS_DURATION);
+            }, 1000); // 長按 1 秒觸開關
         }
+        function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
 
-        function cancelPress() {
-            if (pressTimer) {
-                clearTimeout(pressTimer);
-                pressTimer = null;
-            }
-        }
-
-        magicHotspot.addEventListener('touchstart', (e) => {
-            e.stopPropagation();
-            startPress();
-        }, { passive: true });
-
-        magicHotspot.addEventListener('touchend', (e) => {
-            e.stopPropagation();
-            cancelPress();
-        });
-
-        magicHotspot.addEventListener('touchmove', () => {
-            cancelPress();
-        }, { passive: true });
-
-        magicHotspot.addEventListener('mousedown', (e) => {
-            e.stopPropagation();
-            if (e.button === 0) startPress();
-        });
-
-        magicHotspot.addEventListener('mouseup', (e) => {
-            e.stopPropagation();
-            cancelPress();
-        });
-
-        magicHotspot.addEventListener('mouseleave', () => {
-            cancelPress();
-        });
-
-        function openMagicianModal() {
-            magicianModal.classList.remove('hidden');
-            setTimeout(() => {
-                magicianModal.classList.add('opacity-100');
-            }, 10);
-        }
-
-        settingsSaveBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            state.forceCard.suit = forceSuitSelect.value;
-            state.forceCard.value = forceValueSelect.value;
-            
-            magicianModal.classList.remove('opacity-100');
-            setTimeout(() => {
-                magicianModal.classList.add('hidden');
-            }, 300);
-            
-            playTick();
-        });
+        magicHotspot.addEventListener('touchstart', (e) => { e.stopPropagation(); startPress(); }, { passive: true });
+        magicHotspot.addEventListener('touchend', (e) => { e.stopPropagation(); cancelPress(); });
+        magicHotspot.addEventListener('touchmove', () => { cancelPress(); }, { passive: true });
+        magicHotspot.addEventListener('mousedown', (e) => { e.stopPropagation(); if (e.button === 0) startPress(); });
+        magicHotspot.addEventListener('mouseup', (e) => { e.stopPropagation(); cancelPress(); });
+        magicHotspot.addEventListener('mouseleave', () => { cancelPress(); });
     </script>
 </body>
 </html>
