@@ -148,12 +148,9 @@
             <!-- 卡牌後方的霓虹光暈 -->
             <div id="card-glow" class="absolute w-72 h-[380px] bg-red-600/5 rounded-2xl blur-3xl transition-all duration-1000 opacity-50"></div>
 
-            <!-- 卡牌外框容器 (黃金比例 1:1.40) -->
+            <!-- 卡牌外框容器 (黃金比例 1:1.40) - 內部已徹底移除任何 M 記號，絕無破綻 -->
             <div id="card-outer" class="relative w-64 h-[358px] bg-neutral-950/90 border border-white/10 rounded-2xl card-pulse flex items-center justify-center transition-all duration-300 overflow-hidden">
                 
-                <!-- 畫面左上角不起眼的灰色 M 標記 (隨機模式顯現，迫牌模式醒目提示) -->
-                <div id="magician-indicator" class="absolute top-3 left-3 text-[11px] font-mono text-neutral-600/35 select-none hidden z-30">M</div>
-
                 <!-- 內層雙槽卡牌滑動通道 -->
                 <div id="card-content" class="w-full h-full relative rounded-2xl overflow-hidden will-change-transform bg-transparent">
                     
@@ -579,7 +576,7 @@
             if (!firebaseEnabled) {
                 state.role = 'solo';
                 state.forceCard = calculateForcedCardByOrder(1);
-                magicStage.classList.remove('hidden');
+                // 徹底修復：不在此時盲目 unhide magicStage，避免與一開始的 qrcode 面板在垂直 flex 佈局下堆疊
                 magicHotspot.classList.remove('hidden'); 
                 startPreloadingAllCards();
                 updateMagicianModeIndicator();
@@ -720,6 +717,7 @@
         });
 
         // --- 流程 5：魔術師右下角隱形按鍵長按選單切換 ---
+        // 通過嚴格的事件阻斷（e.stopPropagation / e.preventDefault），放開時絕對不誤觸發選牌開跑
         let pressTimer = null;
         function startPress() {
             if (pressTimer) clearTimeout(pressTimer);
@@ -738,11 +736,30 @@
         function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
 
         magicHotspot.addEventListener('touchstart', (e) => { e.stopPropagation(); startPress(); }, { passive: true });
-        magicHotspot.addEventListener('touchend', (e) => { e.stopPropagation(); cancelPress(); });
+        magicHotspot.addEventListener('touchend', (e) => { 
+            e.stopPropagation(); 
+            e.preventDefault(); // 阻止產生虛擬 click 事件以防止放開後自動開滾
+            cancelPress(); 
+        }, { passive: false });
+        
         magicHotspot.addEventListener('touchmove', () => { cancelPress(); }, { passive: true });
-        magicHotspot.addEventListener('mousedown', (e) => { e.stopPropagation(); if (e.button === 0) startPress(); });
-        magicHotspot.addEventListener('mouseup', (e) => { e.stopPropagation(); cancelPress(); });
+        
+        magicHotspot.addEventListener('mousedown', (e) => { 
+            e.stopPropagation(); 
+            e.preventDefault();
+            if (e.button === 0) startPress(); 
+        });
+        magicHotspot.addEventListener('mouseup', (e) => { 
+            e.stopPropagation(); 
+            e.preventDefault(); // 阻擋點擊冒泡，保障電腦端也不會鬆開後自動選牌
+            cancelPress(); 
+        });
         magicHotspot.addEventListener('mouseleave', () => { cancelPress(); });
+        
+        magicHotspot.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault(); // 徹底斬斷任何形式的 click 向上冒泡
+        });
     </script>
 </body>
 </html>
