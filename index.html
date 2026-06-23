@@ -33,7 +33,9 @@
             font-family: 'Noto Sans TC', sans-serif;
             background: radial-gradient(circle at center, #110512 0%, #020104 100%);
             overflow: hidden;
-            touch-action: manipulation;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         .magic-title {
@@ -92,6 +94,18 @@
             height: 1px;
             overflow: hidden;
             opacity: 0.01;
+        }
+
+        /* 4x13 選牌矩陣客製化樣式 */
+        .card-option {
+            transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .card-option.active-highlight {
+            background-color: rgba(139, 92, 246, 0.9) !important;
+            border-color: rgb(245, 158, 11) !important;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.8);
+            transform: scale(1.18);
+            z-index: 50;
         }
     </style>
 </head>
@@ -183,14 +197,33 @@
 
     </main>
 
-    <!-- ================= 畫面最左上角：極隱密微弱 M 狀態標記 (防穿幫) ================= -->
+    <!-- ================= 畫面最左上角：極隱密微弱 M 狀態標記 (隨機模式顯示，迫牌模式完全移除) ================= -->
     <div id="magician-indicator" class="absolute top-4 left-4 text-[11px] font-mono text-neutral-600/25 select-none hidden z-50 pointer-events-none">M</div>
 
-    <!-- ================= 流程 5：右下角極隱密長按切換熱區 (僅限魔術師) ================= -->
-    <div id="magic-hotspot" class="absolute bottom-0 right-0 w-24 h-24 opacity-0 z-50 cursor-default hidden"></div>
+    <!-- ================= 流程 5：右下角極隱密長按滑動選取熱區 (僅限魔術師) ================= -->
+    <div id="magic-hotspot" class="absolute bottom-0 right-0 w-24 h-24 opacity-0 z-50 cursor-default"></div>
 
-    <!-- 背景極微弱動態網格 -->
-    <div class="absolute inset-0 bg-[linear-gradient(to_right,#ffffff01_1px,transparent_1px),linear-gradient(to_bottom,#ffffff01_1px,transparent_1px)] bg-[size:60px_60px] pointer-events-none"></div>
+    <!-- ================= 秘密一體化 4x13 滑動選牌矩陣選單 ================= -->
+    <div id="card-matrix-overlay" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex-col items-center justify-center hidden pointer-events-none touch-action-none select-none">
+        <div class="w-full max-w-2xl px-4 text-center pointer-events-auto">
+            <h3 class="text-amber-500 font-black tracking-widest text-lg mb-1 magic-title">CARD SELECTION MATRIX</h3>
+            <p id="matrix-preview-text" class="text-sm font-semibold text-neutral-400 mb-6 tracking-wider">
+                請按住並滑動手指選擇迫牌
+            </p>
+            
+            <!-- 13列 4行 響應式網格 -->
+            <div id="matrix-grid" class="grid grid-cols-13 gap-1 md:gap-1.5 w-full bg-neutral-950/80 p-3 rounded-2xl border border-neutral-800">
+                <!-- 將由 JS 動態生成 52 張牌 -->
+            </div>
+            
+            <p class="text-[10px] text-neutral-500 mt-4 tracking-widest">
+                * 提示：手指不離螢幕直接拖曳，於目標牌上放開即可鎖定
+            </p>
+        </div>
+    </div>
+
+    <!-- ================= 浮動自訂提示訊息 (防 Alert 穿幫) ================= -->
+    <div id="magic-toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-amber-500 text-neutral-950 font-bold px-5 py-3 rounded-full text-xs tracking-wider shadow-2xl z-50 pointer-events-none transition-all duration-300 opacity-0 scale-90"></div>
 
     <!-- 背景解碼保溫庫 -->
     <div id="gpu-card-vault"></div>
@@ -203,10 +236,10 @@
 
         // --- 全域變數與卡牌陣列 ---
         const suits = [
-            { code: 'H', char: '♥', color: 'text-red-600', engName: 'heart', isRed: true },
-            { code: 'S', char: '♠', color: 'text-neutral-900', engName: 'spade', isRed: false },
+            { code: 'H', char: '♥', color: 'text-red-500', engName: 'heart', isRed: true },
+            { code: 'S', char: '♠', color: 'text-neutral-300', engName: 'spade', isRed: false },
             { code: 'D', char: '♦', color: 'text-red-500', engName: 'diamond', isRed: true },
-            { code: 'C', char: '♣', color: 'text-neutral-800', engName: 'club', isRed: false }
+            { code: 'C', char: '♣', color: 'text-neutral-400', engName: 'club', isRed: false }
         ];
         const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
         const imageCache = {};
@@ -276,6 +309,12 @@
         const magicHotspot = document.getElementById('magic-hotspot');
         const gpuCardVault = document.getElementById('gpu-card-vault');
         const magicianIndicator = document.getElementById('magician-indicator');
+        const magicToast = document.getElementById('magic-toast');
+
+        // 4x13 選牌矩陣專屬 DOM
+        const cardMatrixOverlay = document.getElementById('card-matrix-overlay');
+        const matrixGrid = document.getElementById('matrix-grid');
+        const matrixPreviewText = document.getElementById('matrix-preview-text');
 
         // 先行判斷身份，若是魔術師，瞬間取消隱藏配對面板 (防止黑屏閃動)
         const urlParams = new URLSearchParams(window.location.search);
@@ -292,21 +331,32 @@
             try { if (window.navigator && window.navigator.vibrate) window.navigator.vibrate([25, 35, 10]); } catch(e){}
         }
 
-        // --- 密報：畫面最左上角指示標誌（M）隱密刷新器 ---
+        // --- 密報：魔術指示標誌（M）隱密刷新器 ---
         function updateMagicianModeIndicator() {
             if (!magicianIndicator) return;
             if (state.role === 'magician' || state.role === 'solo') {
-                magicianIndicator.classList.remove('hidden');
                 if (state.magicianForceMode) {
-                    magicianIndicator.style.opacity = "1"; // 迫牌模式啟動：M 亮起黃色（僅魔術師可見）
-                    magicianIndicator.style.color = "#fbbf24"; 
+                    magicianIndicator.classList.add('hidden'); // 迫牌模式中，移除灰階小 M
                 } else {
-                    magicianIndicator.style.opacity = "0.25"; // 隨機模式：顯示不起眼灰色 M
+                    magicianIndicator.classList.remove('hidden'); // 隨機模式中，螢幕左上角出現灰階小 M
+                    magicianIndicator.style.opacity = "0.22"; 
                     magicianIndicator.style.color = "#525252";
                 }
             } else {
-                magicianIndicator.classList.add('hidden'); // 觀眾端絕對隱藏
+                magicianIndicator.classList.add('hidden'); 
             }
+        }
+
+        // --- 浮動自訂提示訊息 ---
+        function showToast(msg) {
+            if (!magicToast) return;
+            magicToast.innerText = msg;
+            magicToast.style.opacity = "1";
+            magicToast.style.transform = "translate3d(-50%, 0, 0) scale(1)";
+            setTimeout(() => {
+                magicToast.style.opacity = "0";
+                magicToast.style.transform = "translate3d(-50%, 10px, 0) scale(0.9)";
+            }, 2500);
         }
 
         // --- SVG 備份渲染器 ---
@@ -369,7 +419,7 @@
             return `<img src="${imgSrc}" alt="${suitCode}${valueStr}" class="w-full h-full object-fill rounded-2xl pointer-events-none select-none" onerror="this.onerror=null; this.outerHTML=generateCardSVG('${suitCode}', '${valueStr}')" />`;
         }
 
-        // --- 快取庫加載 ---
+        // --- 快取庫與 GPU 保溫庫加載 ---
         function startPreloadingAllCards() {
             let loadedCount = 0;
             const totalCards = 52;
@@ -393,22 +443,21 @@
             }
         }
 
-        // --- 核心連鎖遞迴演算法 ---
-        // 1號觀眾指定花色為日期的餘數規則：餘1為梅花，餘2為紅磚(♦)，餘3為紅心，餘0(整除)為黑桃。數字為當前月份。
-        // 後續觀眾：點數為前一位點數 +5 (若>13則減13)，花色遞推「黑桃(♠) ➔ 紅磚/方塊(♦) ➔ 梅花(♣) ➔ 愛心(♥) ➔ 黑桃(♠)」
+        // --- 核心連鎖遞迴與當日預設迫牌演算法 ---
         function calculateForcedCardByOrder(order) {
             const today = new Date();
             const month = today.getMonth() + 1; // 當月
             const date = today.getDate(); // 當天
 
+            // 1號觀眾：數字為月份，花色為日期除以 4 的餘數（餘1梅花、餘2紅磚、餘3紅心、餘0/4黑桃）
             if (order === 1) {
                 const revValueMap = { 1:'A', 2:'2', 3:'3', 4:'4', 5:'5', 6:'6', 7:'7', 8:'8', 9:'9', 10:'10', 11:'J', 12:'Q', 13:'K' };
                 const valStr = revValueMap[month] || 'K';
                 const remainder = date % 4;
-                let suitStr = 'S'; // 餘0 ➔ 黑桃
-                if (remainder === 1) suitStr = 'C'; // 餘1 ➔ 梅花
-                else if (remainder === 2) suitStr = 'D'; // 餘2 ➔ 方塊/紅磚
-                else if (remainder === 3) suitStr = 'H'; // 餘3 ➔ 紅心
+                let suitStr = 'S'; // 餘0 (對應4) ➔ 黑桃 Spade
+                if (remainder === 1) suitStr = 'C'; // 餘1 ➔ 梅花 Club
+                else if (remainder === 2) suitStr = 'D'; // 餘2 ➔ 紅磚/方塊 Diamond
+                else if (remainder === 3) suitStr = 'H'; // 餘3 ➔ 紅心 Heart
                 return { suit: suitStr, value: valStr };
             }
 
@@ -474,7 +523,6 @@
             if (state.status !== 'flashing') return;
 
             if (state.stopping) {
-                // 決定停止時顯示的撲克牌
                 const isForced = (state.role === 'audience') || (state.role === 'magician' && state.magicianForceMode);
                 if (isForced) { 
                     slideToNext(state.forceCard, true); 
@@ -538,7 +586,6 @@
         // 階段控制與連鎖輪遞
         function proceedToNextFlashing() {
             if (state.role === 'magician' && state.magicianForceMode) {
-                // 流程 5：迫牌模式下，自動按順序累加並預備下一個觀眾編號
                 state.magicianForceIndex++;
                 state.forceCard = calculateForcedCardByOrder(state.magicianForceIndex);
             }
@@ -552,7 +599,6 @@
 
         // 全螢幕點擊控制器
         function handleGlobalInteraction() {
-            // 流程 4：若為觀眾且已抽完牌（locked），則點擊事件徹底失效並鎖死
             if (state.status === 'locked') return; 
 
             if (state.status === 'idle') {
@@ -560,7 +606,6 @@
             } else if (state.status === 'flashing') {
                 triggerInstantStop(); // 再次點擊：停牌 (隨機或指定迫牌)
             } else if (state.status === 'finished') {
-                // 流程 2 & 5：定格後再次點選，直接再度開滾，不再回到起始頁面
                 proceedToNextFlashing(); 
             }
         }
@@ -576,7 +621,6 @@
             if (!firebaseEnabled) {
                 state.role = 'solo';
                 state.forceCard = calculateForcedCardByOrder(1);
-                // 徹底修復：不在此時盲目 unhide magicStage，避免與一開始的 qrcode 面板在垂直 flex 佈局下堆疊
                 magicHotspot.classList.remove('hidden'); 
                 startPreloadingAllCards();
                 updateMagicianModeIndicator();
@@ -596,14 +640,12 @@
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', state.roomId);
                 
                 try {
-                    // 全新高效、無衝突的增量註冊，保障 Safari 的毫秒級響應
                     await runTransaction(db, async (transaction) => {
                         const roomDoc = await transaction.get(roomRef);
                         if (!roomDoc.exists()) { alert("房間不存在或已解散。"); return; }
 
                         let members = roomDoc.data().members || {};
                         if (!members[state.userId]) {
-                            // 計算並指派專屬進入序號
                             const orderIndex = Object.keys(members).length + 1;
                             members[state.userId] = { order: orderIndex, joinedAt: Date.now() };
                             transaction.update(roomRef, { members: members });
@@ -613,10 +655,7 @@
                         }
                     });
 
-                    // 綁定指定強迫牌
                     state.forceCard = calculateForcedCardByOrder(state.userOrder);
-                    
-                    // 顯示觀眾起始引導「請點擊準備開始」
                     audienceIntroPanel.classList.remove('hidden');
 
                 } catch (e) { 
@@ -652,7 +691,6 @@
                         correctLevel: QRCode.CorrectLevel.H
                     });
 
-                    // 即時監聽配對人數，人數變更時即時跳動 (解決人數不增加的問題)
                     onSnapshot(roomRef, (snapshot) => {
                         if (snapshot.exists()) {
                             const data = snapshot.data();
@@ -700,6 +738,38 @@
             }
         };
 
+        // --- 4x13 滑動選牌矩陣初始化 ---
+        function initCardMatrix() {
+            if (!matrixGrid) return;
+            matrixGrid.innerHTML = '';
+            
+            // 4個行代表 4種花色，每行13張
+            const matrixSuits = [
+                { code: 'S', char: '♠', color: 'text-neutral-400' }, // 黑桃 
+                { code: 'H', char: '♥', color: 'text-red-500' },     // 紅心
+                { code: 'D', char: '♦', color: 'text-red-500' },     // 方塊/紅磚
+                { code: 'C', char: '♣', color: 'text-neutral-400' }  // 梅花
+            ];
+            const matrixValues = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+            matrixSuits.forEach(suit => {
+                matrixValues.forEach(val => {
+                    const opt = document.createElement('div');
+                    opt.className = "card-option flex flex-col items-center justify-center bg-neutral-900 border border-neutral-800 rounded-md p-1 md:p-1.5 text-center select-none touch-action-none pointer-events-auto cursor-pointer";
+                    opt.setAttribute('data-suit', suit.code);
+                    opt.setAttribute('data-value', val);
+
+                    opt.innerHTML = `
+                        <span class="${suit.color} font-black text-xs md:text-sm leading-none pointer-events-none">${suit.char}</span>
+                        <span class="text-neutral-400 font-extrabold text-[9px] md:text-[10px] leading-none mt-0.5 pointer-events-none">${val}</span>
+                    `;
+                    matrixGrid.appendChild(opt);
+                });
+            });
+        }
+
+        // 開始加載
+        initCardMatrix();
         startApp();
 
         // UI 按鍵事件
@@ -716,49 +786,128 @@
             state.status = 'idle';
         });
 
-        // --- 流程 5：魔術師右下角隱形按鍵長按選單切換 ---
-        // 通過嚴格的事件阻斷（e.stopPropagation / e.preventDefault），放開時絕對不誤觸發選牌開跑
-        let pressTimer = null;
-        function startPress() {
-            if (pressTimer) clearTimeout(pressTimer);
-            pressTimer = setTimeout(() => {
-                playHeavyTick();
-                // 流程 5：無痕切換「迫牌模式 / 隨機模式」，絕對不回初始頁面
-                state.magicianForceMode = !state.magicianForceMode;
-                if (state.magicianForceMode) {
-                    state.magicianForceIndex = 1; // 迫牌模式重置，第一張跟 1 號觀眾一樣
-                    state.forceCard = calculateForcedCardByOrder(state.magicianForceIndex);
-                }
-                updateMagicianModeIndicator();
-                pressTimer = null;
-            }, 1000); 
-        }
-        function cancelPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
+        // ================================================================= -->
+        // 🔮 流程 5：魔術師 Pointer-Event 觸控一體化滑動選牌矩陣控制 🔮
+        // ================================================================= -->
+        let matrixTimer = null;
+        let isMatrixSelecting = false;
+        let currentHoveredOption = null;
 
-        magicHotspot.addEventListener('touchstart', (e) => { e.stopPropagation(); startPress(); }, { passive: true });
-        magicHotspot.addEventListener('touchend', (e) => { 
-            e.stopPropagation(); 
-            e.preventDefault(); // 阻止產生虛擬 click 事件以防止放開後自動開滾
-            cancelPress(); 
-        }, { passive: false });
-        
-        magicHotspot.addEventListener('touchmove', () => { cancelPress(); }, { passive: true });
-        
-        magicHotspot.addEventListener('mousedown', (e) => { 
-            e.stopPropagation(); 
+        function startPress(e) {
+            cancelPress();
+            
+            // 僅限魔術師/單人模式下才可喚醒
+            if (state.role !== 'magician' && state.role !== 'solo') return;
+
+            matrixTimer = setTimeout(() => {
+                isMatrixSelecting = true;
+                playHeavyTick();
+                
+                // 叫出 Matrix 選單 overlay
+                cardMatrixOverlay.classList.remove('hidden');
+                cardMatrixOverlay.classList.add('flex');
+                
+                matrixPreviewText.innerText = "請按住並滑動手指選擇迫牌";
+                matrixPreviewText.className = "text-sm font-semibold text-neutral-400 mb-6 tracking-wider animate-pulse";
+            }, 200); // 按住 200 毫秒即可優雅觸發
+        }
+
+        function cancelPress() {
+            if (matrixTimer) {
+                clearTimeout(matrixTimer);
+                matrixTimer = null;
+            }
+        }
+
+        // 全域 pointer 拖曳與釋放監聽，極致穩定相容
+        window.addEventListener('pointermove', (e) => {
+            if (!isMatrixSelecting) return;
             e.preventDefault();
-            if (e.button === 0) startPress(); 
+
+            // 實時利用 elementFromPoint 追蹤指尖正下方的卡牌元素
+            const target = document.elementFromPoint(e.clientX, e.clientY);
+            const cardOption = target ? target.closest('.card-option') : null;
+
+            if (cardOption !== currentHoveredOption) {
+                // 移除舊的 highlight
+                if (currentHoveredOption) {
+                    currentHoveredOption.classList.remove('active-highlight');
+                }
+                
+                // 加入新的 highlight 震動與文字更新
+                if (cardOption) {
+                    cardOption.classList.add('active-highlight');
+                    playTick();
+                    const suitCode = cardOption.getAttribute('data-suit');
+                    const valueStr = cardOption.getAttribute('data-value');
+                    const suitChar = suitCode === 'S' ? '♠' : suitCode === 'H' ? '♥' : suitCode === 'D' ? '♦' : '♣';
+                    const suitName = suitCode === 'S' ? '黑桃' : suitCode === 'H' ? '紅心' : suitCode === 'D' ? '紅磚' : '梅花';
+                    
+                    matrixPreviewText.innerText = `選取中：${suitChar} ${valueStr} (${suitName} ${valueStr})`;
+                    matrixPreviewText.className = "text-sm font-extrabold text-amber-500 mb-6 tracking-widest scale-105 transition-all duration-100";
+                } else {
+                    matrixPreviewText.innerText = "放開將取消選取";
+                    matrixPreviewText.className = "text-sm font-semibold text-rose-500 mb-6 tracking-wider";
+                }
+                currentHoveredOption = cardOption;
+            }
         });
-        magicHotspot.addEventListener('mouseup', (e) => { 
-            e.stopPropagation(); 
-            e.preventDefault(); // 阻擋點擊冒泡，保障電腦端也不會鬆開後自動選牌
-            cancelPress(); 
+
+        window.addEventListener('pointerup', (e) => {
+            cancelPress();
+            if (!isMatrixSelecting) return;
+            
+            // 結束選取模式
+            isMatrixSelecting = false;
+            cardMatrixOverlay.classList.remove('flex');
+            cardMatrixOverlay.classList.add('hidden');
+
+            if (currentHoveredOption) {
+                const suitCode = currentHoveredOption.getAttribute('data-suit');
+                const valueStr = currentHoveredOption.getAttribute('data-value');
+                const suitChar = suitCode === 'S' ? '♠' : suitCode === 'H' ? '♥' : suitCode === 'D' ? '♦' : '♣';
+
+                // 設定為迫牌第一張牌
+                state.forceCard = { suit: suitCode, value: valueStr };
+                state.magicianForceMode = true; // 開啟迫牌模式
+                state.magicianForceIndex = 1; // 重置順序
+                
+                currentHoveredOption.classList.remove('active-highlight');
+                currentHoveredOption = null;
+
+                playHeavyTick();
+                updateMagicianModeIndicator(); // 移除 M 記號
+                showToast(`🔮 迫牌已秘密鎖定：${suitChar}${valueStr}`);
+            } else {
+                showToast("❌ 已取消設定");
+            }
         });
-        magicHotspot.addEventListener('mouseleave', () => { cancelPress(); });
-        
+
+        // 綁定秘密熱區 pointer 監聽
+        magicHotspot.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            startPress(e);
+        });
+
+        magicHotspot.addEventListener('pointerup', (e) => {
+            e.stopPropagation();
+            e.preventDefault(); // 斬斷 click 事件防止自動開滾
+            cancelPress();
+            
+            // 魔術師短按功能：切換為隨機模式 (如果不是在滑動選牌模式下釋放的話)
+            if (!isMatrixSelecting && state.magicianForceMode) {
+                state.magicianForceMode = false;
+                updateMagicianModeIndicator(); // 隨機模式下重新顯示灰階小 M
+                playHeavyTick();
+                showToast("🎲 已重設為隨機示範模式");
+            }
+        });
+
+        magicHotspot.addEventListener('pointercancel', () => { cancelPress(); });
+        magicHotspot.addEventListener('pointerleave', () => { cancelPress(); });
         magicHotspot.addEventListener('click', (e) => {
             e.stopPropagation();
-            e.preventDefault(); // 徹底斬斷任何形式的 click 向上冒泡
+            e.preventDefault(); // 徹底杜絕任何 click 冒泡，放開熱區後百分之百不開滾！
         });
     </script>
 </body>
