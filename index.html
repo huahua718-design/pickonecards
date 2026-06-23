@@ -203,8 +203,8 @@
     <!-- ================= 流程 5：右下角極隱密長按滑動選取熱區 (僅限魔術師) ================= -->
     <div id="magic-hotspot" class="absolute bottom-0 right-0 w-24 h-24 opacity-0 z-50 cursor-default"></div>
 
-    <!-- ================= 秘密一體化 4x13 滑動選牌矩陣選單 ================= -->
-    <div id="card-matrix-overlay" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex-col items-center justify-center hidden pointer-events-none touch-action-none select-none">
+    <!-- ================= 秘密一體化 4x13 滑動選牌矩陣選單 (justify-end 下移至畫面最底部) ================= -->
+    <div id="card-matrix-overlay" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex-col items-center justify-end pb-12 hidden pointer-events-none touch-action-none select-none">
         <div class="w-full max-w-2xl px-4 text-center pointer-events-auto">
             <h3 class="text-amber-500 font-black tracking-widest text-lg mb-1 magic-title">CARD SELECTION MATRIX</h3>
             <p id="matrix-preview-text" class="text-sm font-semibold text-neutral-400 mb-6 tracking-wider">
@@ -221,9 +221,6 @@
             </p>
         </div>
     </div>
-
-    <!-- ================= 浮動自訂提示訊息 (防 Alert 穿幫) ================= -->
-    <div id="magic-toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-amber-500 text-neutral-950 font-bold px-5 py-3 rounded-full text-xs tracking-wider shadow-2xl z-50 pointer-events-none transition-all duration-300 opacity-0 scale-90"></div>
 
     <!-- 背景解碼保溫庫 -->
     <div id="gpu-card-vault"></div>
@@ -244,7 +241,7 @@
         const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
         const imageCache = {};
 
-        // 魔術狀態機
+        // 魔術狀態機 (預設 magicianForceMode = false ➔ 隨機展示模式)
         let state = {
             role: 'solo', 
             roomId: '',
@@ -253,7 +250,7 @@
             status: 'idle', // 'idle' (等待點擊), 'flashing' (滾動中), 'finished' (定格), 'locked' (觀眾永久鎖死)
             normalSpeed: 220, 
             forceCard: null, 
-            magicianForceMode: false, // 流程 5：魔術師迫牌模式開關
+            magicianForceMode: false, // 預設關閉迫牌，初始以「隨機模式」供魔術師展示
             magicianForceIndex: 1, 
             flashTimeout: null,
             currentDisplayCard: null,
@@ -309,7 +306,6 @@
         const magicHotspot = document.getElementById('magic-hotspot');
         const gpuCardVault = document.getElementById('gpu-card-vault');
         const magicianIndicator = document.getElementById('magician-indicator');
-        const magicToast = document.getElementById('magic-toast');
 
         // 4x13 選牌矩陣專屬 DOM
         const cardMatrixOverlay = document.getElementById('card-matrix-overlay');
@@ -345,18 +341,6 @@
             } else {
                 magicianIndicator.classList.add('hidden'); 
             }
-        }
-
-        // --- 浮動自訂提示訊息 ---
-        function showToast(msg) {
-            if (!magicToast) return;
-            magicToast.innerText = msg;
-            magicToast.style.opacity = "1";
-            magicToast.style.transform = "translate3d(-50%, 0, 0) scale(1)";
-            setTimeout(() => {
-                magicToast.style.opacity = "0";
-                magicToast.style.transform = "translate3d(-50%, 10px, 0) scale(0.9)";
-            }, 2500);
         }
 
         // --- SVG 備份渲染器 ---
@@ -449,7 +433,7 @@
             const month = today.getMonth() + 1; // 當月
             const date = today.getDate(); // 當天
 
-            // 1號觀眾：數字為月份，花色為日期除以 4 的餘數（餘1梅花、餘2紅磚、餘3紅心、餘0黑桃）
+            // 1號觀眾：數字為月份，花色為日期除以 4 的餘數（餘1梅花、餘2紅磚、餘3紅心、餘0/4黑桃）
             if (order === 1) {
                 const revValueMap = { 1:'A', 2:'2', 3:'3', 4:'4', 5:'5', 6:'6', 7:'7', 8:'8', 9:'9', 10:'10', 11:'J', 12:'Q', 13:'K' };
                 const valStr = revValueMap[month] || 'K';
@@ -620,6 +604,7 @@
         async function setupRoomConnections() {
             if (!firebaseEnabled) {
                 state.role = 'solo';
+                // 預設為隨機展示模式，迫牌第一張雖已演算好，但非主動模式
                 state.forceCard = calculateForcedCardByOrder(1);
                 magicHotspot.classList.remove('hidden'); 
                 startPreloadingAllCards();
@@ -791,16 +776,13 @@
         // ================================================================= -->
         let pressTimer = null;
         let isMatrixSelecting = false;
-        let longPressed = false;
         let currentHoveredOption = null;
 
         function startPress(e) {
             cancelPress();
             if (state.role !== 'magician' && state.role !== 'solo') return;
-            longPressed = false;
 
             pressTimer = setTimeout(() => {
-                longPressed = true;
                 const isStartingScreen = !defaultCardUi.classList.contains('hidden');
 
                 // 只有在「單人起始畫面（defaultCardUi 尚未被隱藏）」長按才彈出選牌選單
@@ -808,27 +790,24 @@
                     isMatrixSelecting = true;
                     playHeavyTick();
                     
-                    // 叫出 4x13 Grid Table Matrix 選單 overlay
+                    // 叫出 4x13 Grid Table Matrix 選單 overlay (位置已下移)
                     cardMatrixOverlay.classList.remove('hidden');
                     cardMatrixOverlay.classList.add('flex');
                     
                     matrixPreviewText.innerText = "請按住並滑動手指選擇迫牌";
                     matrixPreviewText.className = "text-sm font-semibold text-neutral-400 mb-6 tracking-wider animate-pulse";
                 } else {
-                    // 已脫離起始畫面：長按切換隨機模式與迫牌模式
+                    // 已脫離起始畫面：長按無聲切換隨機模式與迫牌模式 (移除所有 Toast)
                     isMatrixSelecting = false;
                     playHeavyTick();
                     state.magicianForceMode = !state.magicianForceMode;
                     if (state.magicianForceMode) {
                         state.magicianForceIndex = 1; // 迫牌重置，第一張跟1號觀眾一樣
                         state.forceCard = calculateForcedCardByOrder(state.magicianForceIndex);
-                        showToast("🔮 已開啟：迫牌模式");
-                    } else {
-                        showToast("🎲 已開啟：隨機模式");
                     }
                     updateMagicianModeIndicator();
                 }
-            }, 350); // 350ms 標準長按觸發值
+            }, 250); // 250ms 標準長按觸發值
         }
 
         function cancelPress() {
@@ -876,7 +855,7 @@
             cancelPress();
             if (!isMatrixSelecting) return;
             
-            // 結束選取模式
+            // 結束選取模式：立即收起，回到 Ready 起始畫面 (移除所有 Toast)
             isMatrixSelecting = false;
             cardMatrixOverlay.classList.remove('flex');
             cardMatrixOverlay.classList.add('hidden');
@@ -884,7 +863,6 @@
             if (currentHoveredOption) {
                 const suitCode = currentHoveredOption.getAttribute('data-suit');
                 const valueStr = currentHoveredOption.getAttribute('data-value');
-                const suitChar = suitCode === 'S' ? '♠' : suitCode === 'H' ? '♥' : suitCode === 'D' ? '♦' : '♣';
 
                 // 設定為迫牌第一張牌
                 state.forceCard = { suit: suitCode, value: valueStr };
@@ -895,10 +873,7 @@
                 currentHoveredOption = null;
 
                 playHeavyTick();
-                updateMagicianModeIndicator(); // 移除 M 記號
-                showToast(`🔮 迫牌已秘密鎖定：${suitChar}${valueStr}`);
-            } else {
-                showToast("❌ 已取消設定");
+                updateMagicianModeIndicator(); // 迫牌模式：左上角灰階小 M 自動徹底隱藏
             }
         });
 
@@ -913,7 +888,17 @@
             e.preventDefault(); // 斬斷 click 事件防止自動開滾
             cancelPress();
             
-            // 如果不是長按，短按的話不要觸發任何事件 (防止鬆開後誤觸開滾)
+            // 若為短按且「已脫離起始畫面」，按一下切換隨機模式與迫牌模式
+            const isStartingScreen = !defaultCardUi.classList.contains('hidden');
+            if (!isMatrixSelecting && !isStartingScreen) {
+                state.magicianForceMode = !state.magicianForceMode;
+                if (state.magicianForceMode) {
+                    state.magicianForceIndex = 1;
+                    state.forceCard = calculateForcedCardByOrder(state.magicianForceIndex);
+                }
+                updateMagicianModeIndicator();
+                playHeavyTick();
+            }
         });
 
         magicHotspot.addEventListener('pointercancel', () => { cancelPress(); });
