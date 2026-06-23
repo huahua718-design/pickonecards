@@ -211,9 +211,9 @@
                 請按住並滑動手指選擇迫牌
             </p>
             
-            <!-- 13列 4行 響應式網格 -->
-            <div id="matrix-grid" class="grid grid-cols-13 gap-1 md:gap-1.5 w-full bg-neutral-950/80 p-3 rounded-2xl border border-neutral-800">
-                <!-- 將由 JS 動態生成 52 張牌 -->
+            <!-- 13列 4行 表格式網格 - 引入 inline style 確保 100% 呈現 4x13 表格 -->
+            <div id="matrix-grid" class="grid gap-1 md:gap-1.5 w-full bg-neutral-950/80 p-3 rounded-2xl border border-neutral-800" style="grid-template-columns: repeat(13, minmax(0, 1fr));">
+                <!-- 由 JS 動態生成 52 張牌 -->
             </div>
             
             <p class="text-[10px] text-neutral-500 mt-4 tracking-widest">
@@ -236,8 +236,8 @@
 
         // --- 全域變數與卡牌陣列 ---
         const suits = [
-            { code: 'H', char: '♥', color: 'text-red-500', engName: 'heart', isRed: true },
             { code: 'S', char: '♠', color: 'text-neutral-300', engName: 'spade', isRed: false },
+            { code: 'H', char: '♥', color: 'text-red-500', engName: 'heart', isRed: true },
             { code: 'D', char: '♦', color: 'text-red-500', engName: 'diamond', isRed: true },
             { code: 'C', char: '♣', color: 'text-neutral-400', engName: 'club', isRed: false }
         ];
@@ -449,7 +449,7 @@
             const month = today.getMonth() + 1; // 當月
             const date = today.getDate(); // 當天
 
-            // 1號觀眾：數字為月份，花色為日期除以 4 的餘數（餘1梅花、餘2紅磚、餘3紅心、餘0/4黑桃）
+            // 1號觀眾：數字為月份，花色為日期除以 4 的餘數（餘1梅花、餘2紅磚、餘3紅心、餘0黑桃）
             if (order === 1) {
                 const revValueMap = { 1:'A', 2:'2', 3:'3', 4:'4', 5:'5', 6:'6', 7:'7', 8:'8', 9:'9', 10:'10', 11:'J', 12:'Q', 13:'K' };
                 const valStr = revValueMap[month] || 'K';
@@ -743,7 +743,7 @@
             if (!matrixGrid) return;
             matrixGrid.innerHTML = '';
             
-            // 4個行代表 4種花色，每行13張
+            // 4個行代表 4種花色，每行13張（Spades, Hearts, Diamonds, Clubs）
             const matrixSuits = [
                 { code: 'S', char: '♠', color: 'text-neutral-400' }, // 黑桃 
                 { code: 'H', char: '♥', color: 'text-red-500' },     // 紅心
@@ -789,33 +789,52 @@
         // ================================================================= -->
         // 🔮 流程 5：魔術師 Pointer-Event 觸控一體化滑動選牌矩陣控制 🔮
         // ================================================================= -->
-        let matrixTimer = null;
+        let pressTimer = null;
         let isMatrixSelecting = false;
+        let longPressed = false;
         let currentHoveredOption = null;
 
         function startPress(e) {
             cancelPress();
-            
-            // 僅限魔術師/單人模式下才可喚醒
             if (state.role !== 'magician' && state.role !== 'solo') return;
+            longPressed = false;
 
-            matrixTimer = setTimeout(() => {
-                isMatrixSelecting = true;
-                playHeavyTick();
-                
-                // 叫出 Matrix 選單 overlay
-                cardMatrixOverlay.classList.remove('hidden');
-                cardMatrixOverlay.classList.add('flex');
-                
-                matrixPreviewText.innerText = "請按住並滑動手指選擇迫牌";
-                matrixPreviewText.className = "text-sm font-semibold text-neutral-400 mb-6 tracking-wider animate-pulse";
-            }, 200); // 按住 200 毫秒即可優雅觸發
+            pressTimer = setTimeout(() => {
+                longPressed = true;
+                const isStartingScreen = !defaultCardUi.classList.contains('hidden');
+
+                // 只有在「單人起始畫面（defaultCardUi 尚未被隱藏）」長按才彈出選牌選單
+                if (isStartingScreen) {
+                    isMatrixSelecting = true;
+                    playHeavyTick();
+                    
+                    // 叫出 4x13 Grid Table Matrix 選單 overlay
+                    cardMatrixOverlay.classList.remove('hidden');
+                    cardMatrixOverlay.classList.add('flex');
+                    
+                    matrixPreviewText.innerText = "請按住並滑動手指選擇迫牌";
+                    matrixPreviewText.className = "text-sm font-semibold text-neutral-400 mb-6 tracking-wider animate-pulse";
+                } else {
+                    // 已脫離起始畫面：長按切換隨機模式與迫牌模式
+                    isMatrixSelecting = false;
+                    playHeavyTick();
+                    state.magicianForceMode = !state.magicianForceMode;
+                    if (state.magicianForceMode) {
+                        state.magicianForceIndex = 1; // 迫牌重置，第一張跟1號觀眾一樣
+                        state.forceCard = calculateForcedCardByOrder(state.magicianForceIndex);
+                        showToast("🔮 已開啟：迫牌模式");
+                    } else {
+                        showToast("🎲 已開啟：隨機模式");
+                    }
+                    updateMagicianModeIndicator();
+                }
+            }, 350); // 350ms 標準長按觸發值
         }
 
         function cancelPress() {
-            if (matrixTimer) {
-                clearTimeout(matrixTimer);
-                matrixTimer = null;
+            if (pressTimer) {
+                clearTimeout(pressTimer);
+                pressTimer = null;
             }
         }
 
@@ -894,13 +913,7 @@
             e.preventDefault(); // 斬斷 click 事件防止自動開滾
             cancelPress();
             
-            // 魔術師短按功能：切換為隨機模式 (如果不是在滑動選牌模式下釋放的話)
-            if (!isMatrixSelecting && state.magicianForceMode) {
-                state.magicianForceMode = false;
-                updateMagicianModeIndicator(); // 隨機模式下重新顯示灰階小 M
-                playHeavyTick();
-                showToast("🎲 已重設為隨機示範模式");
-            }
+            // 如果不是長按，短按的話不要觸發任何事件 (防止鬆開後誤觸開滾)
         });
 
         magicHotspot.addEventListener('pointercancel', () => { cancelPress(); });
