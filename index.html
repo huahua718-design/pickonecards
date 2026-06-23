@@ -201,10 +201,10 @@
     <div id="magician-indicator" class="absolute top-4 left-4 text-[11px] font-mono text-neutral-600/25 select-none hidden z-50 pointer-events-none">M</div>
 
     <!-- ================= 流程 5：右下角極隱密長按滑動選取熱區 (僅限魔術師) ================= -->
-    <div id="magic-hotspot" class="absolute bottom-0 right-0 w-24 h-24 opacity-0 z-50 cursor-default"></div>
+    <div id="magic-hotspot" class="absolute bottom-0 right-0 w-24 h-24 opacity-0 z-[100] cursor-default select-none touch-action-none"></div>
 
-    <!-- ================= 秘密一體化 4x13 滑動選牌矩陣選單 (justify-end 下移至畫面最底部) ================= -->
-    <div id="card-matrix-overlay" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex-col items-center justify-end pb-12 hidden pointer-events-none touch-action-none select-none">
+    <!-- ================= 秘密一體化 4x13 滑動選牌矩陣選單 (精準下移，防誤觸，拇指友善) ================= -->
+    <div id="card-matrix-overlay" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex flex-col items-center justify-end pb-12 hidden pointer-events-none touch-action-none select-none">
         <div class="w-full max-w-2xl px-4 text-center pointer-events-auto">
             <h3 class="text-amber-500 font-black tracking-widest text-lg mb-1 magic-title">CARD SELECTION MATRIX</h3>
             <p id="matrix-preview-text" class="text-sm font-semibold text-neutral-400 mb-6 tracking-wider">
@@ -433,7 +433,7 @@
             const month = today.getMonth() + 1; // 當月
             const date = today.getDate(); // 當天
 
-            // 1號觀眾：數字為月份，花色為日期除以 4 的餘數（餘1梅花、餘2紅磚、餘3紅心、餘0/4黑桃）
+            // 1號觀眾：數字為月份，花色為日期除以 4 的餘數（餘1梅花、餘2紅磚/方塊、餘3紅心、餘0/4黑桃）
             if (order === 1) {
                 const revValueMap = { 1:'A', 2:'2', 3:'3', 4:'4', 5:'5', 6:'6', 7:'7', 8:'8', 9:'9', 10:'10', 11:'J', 12:'Q', 13:'K' };
                 const valStr = revValueMap[month] || 'K';
@@ -530,7 +530,7 @@
             
             defaultCardUi.classList.add('hidden');
             cardOuter.classList.add('scale-105');
-            cardGlow.className = "absolute w-72 h-[380px] bg-red-500/20 rounded-2xl blur-3xl opacity-100 transition-all duration-300";
+            cardGlow.className = "absolute w-72 h-[380px] bg-red-600/5 rounded-2xl blur-3xl transition-all duration-1000 opacity-50";
 
             const startCard = drawNextCard();
             slotActive.innerHTML = generateCardImageHTML(startCard.suit, startCard.value);
@@ -817,6 +817,33 @@
             }
         }
 
+        // --- 核心提交函數（一體化解決放手不選定與 iOS Safari 觸控取消 bug） ---
+        function handlePointerCommit() {
+            cancelPress();
+            if (!isMatrixSelecting) return;
+            
+            // 結束選取模式：立即無痕收起
+            isMatrixSelecting = false;
+            cardMatrixOverlay.classList.remove('flex');
+            cardMatrixOverlay.classList.add('hidden');
+
+            if (currentHoveredOption) {
+                const suitCode = currentHoveredOption.getAttribute('data-suit');
+                const valueStr = currentHoveredOption.getAttribute('data-value');
+
+                // 設定為迫牌第一張牌
+                state.forceCard = { suit: suitCode, value: valueStr };
+                state.magicianForceMode = true; // 開啟迫牌模式
+                state.magicianForceIndex = 1; // 重置順序
+                
+                currentHoveredOption.classList.remove('active-highlight');
+                currentHoveredOption = null;
+
+                playHeavyTick();
+                updateMagicianModeIndicator(); // 迫牌模式：左上角灰階小 M 自動徹底隱藏
+            }
+        }
+
         // 全域 pointer 拖曳與釋放監聽，極致穩定相容
         window.addEventListener('pointermove', (e) => {
             if (!isMatrixSelecting) return;
@@ -851,30 +878,13 @@
             }
         });
 
-        window.addEventListener('pointerup', (e) => {
-            cancelPress();
-            if (!isMatrixSelecting) return;
-            
-            // 結束選取模式：立即收起，回到 Ready 起始畫面 (移除所有 Toast)
-            isMatrixSelecting = false;
-            cardMatrixOverlay.classList.remove('flex');
-            cardMatrixOverlay.classList.add('hidden');
+        // 監聽正常釋放與瀏覽器異常取消觸碰 (例如 iOS 觸碰物件重疊時自動發送的 pointercancel)
+        window.addEventListener('pointerup', () => {
+            handlePointerCommit();
+        });
 
-            if (currentHoveredOption) {
-                const suitCode = currentHoveredOption.getAttribute('data-suit');
-                const valueStr = currentHoveredOption.getAttribute('data-value');
-
-                // 設定為迫牌第一張牌
-                state.forceCard = { suit: suitCode, value: valueStr };
-                state.magicianForceMode = true; // 開啟迫牌模式
-                state.magicianForceIndex = 1; // 重置順序
-                
-                currentHoveredOption.classList.remove('active-highlight');
-                currentHoveredOption = null;
-
-                playHeavyTick();
-                updateMagicianModeIndicator(); // 迫牌模式：左上角灰階小 M 自動徹底隱藏
-            }
+        window.addEventListener('pointercancel', () => {
+            handlePointerCommit();
         });
 
         // 綁定秘密熱區 pointer 監聽
